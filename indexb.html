@@ -1,0 +1,962 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WorkFlow</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 40px;
+        }
+
+        .header h1 {
+            font-size: 3em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        .mode-indicator {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            display: inline-block;
+            margin-top: 10px;
+            font-size: 0.9em;
+            font-weight: 600;
+        }
+
+        .mode-indicator.mock {
+            background: #ffc107;
+            color: #000;
+        }
+
+        .login-card {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            text-align: center;
+        }
+
+        .login-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .google-btn, .microsoft-btn {
+            background: white;
+            border: 2px solid #4285f4;
+            color: #4285f4;
+            padding: 15px 30px;
+            font-size: 16px;
+            border-radius: 10px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            transition: all 0.3s;
+            font-weight: 600;
+        }
+
+        .microsoft-btn {
+            border-color: #00a4ef;
+            color: #00a4ef;
+        }
+
+        .google-btn:hover {
+            background: #4285f4;
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(66, 133, 244, 0.4);
+        }
+
+        .microsoft-btn:hover {
+            background: #00a4ef;
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 164, 239, 0.4);
+        }
+
+        .btn-disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .assignments-container {
+            display: none;
+        }
+
+        .assignments-container.active {
+            display: block;
+        }
+
+        .user-info {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .user-info h2 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .connected-accounts {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+
+        .account-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            background: #e8f5e9;
+            color: #2e7d32;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: 600;
+        }
+
+        .account-badge.microsoft {
+            background: #e3f2fd;
+            color: #1565c0;
+        }
+
+        .logout-btn {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .logout-btn:hover {
+            background: #c82333;
+            transform: translateY(-2px);
+        }
+
+        .assignment-card {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            border-left: 5px solid #667eea;
+            transition: all 0.3s;
+        }
+
+        .assignment-card.teams {
+            border-left-color: #00a4ef;
+        }
+
+        .assignment-card:hover {
+            transform: translateX(5px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        }
+
+        .assignment-source {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.75em;
+            font-weight: 700;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .source-google {
+            background: #e8f4fd;
+            color: #1967d2;
+        }
+
+        .source-teams {
+            background: #e3f2fd;
+            color: #0078d4;
+        }
+
+        .assignment-title {
+            font-size: 1.3em;
+            color: #333;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+
+        .assignment-course {
+            color: #667eea;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .assignment-due {
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        .assignment-status {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 600;
+            margin-top: 10px;
+        }
+
+        .status-pending {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .status-late {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .status-submitted {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .loading {
+            text-align: center;
+            color: white;
+            font-size: 1.2em;
+            padding: 40px;
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            border-left: 4px solid #dc3545;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
+            background: white;
+            border-radius: 15px;
+        }
+
+        .empty-state h3 {
+            font-size: 1.5em;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 WorkFlow</h1>
+            <p>Track all your assignments in one place</p>
+            <div class="mode-indicator" id="modeIndicator"></div>
+        </div>
+
+        <!-- Login Screen -->
+        <div class="login-card" id="loginScreen">
+            <h2 style="margin-bottom: 20px; color: #333;">Welcome to WorkFlow</h2>
+            <p style="color: #666; margin-bottom: 30px;">Connect your accounts to see your assignments</p>
+            <div class="login-buttons">
+                <button class="google-btn" id="googleLoginBtn">
+                    <svg width="20" height="20" viewBox="0 0 20 20">
+                        <path fill="#4285f4" d="M19.6 10.23c0-.82-.1-1.42-.25-2.05H10v3.72h5.5c-.15.96-.74 2.31-2.04 3.22v2.45h3.16c1.89-1.73 2.98-4.3 2.98-7.34z"/>
+                        <path fill="#34a853" d="M13.46 15.13c-.83.59-1.96 1-3.46 1-2.64 0-4.88-1.74-5.68-4.15H1.07v2.52C2.72 17.75 6.09 20 10 20c2.7 0 4.96-.89 6.62-2.42l-3.16-2.45z"/>
+                        <path fill="#fbbc05" d="M3.99 10c0-.69.12-1.35.32-1.97V5.51H1.07A9.973 9.973 0 000 10c0 1.61.39 3.14 1.07 4.49l3.24-2.52c-.2-.62-.32-1.28-.32-1.97z"/>
+                        <path fill="#ea4335" d="M10 3.88c1.88 0 3.13.81 3.85 1.48l2.84-2.76C14.96.99 12.7 0 10 0 6.09 0 2.72 2.25 1.07 5.51l3.24 2.52C5.12 5.62 7.36 3.88 10 3.88z"/>
+                    </svg>
+                    Sign in with Google Classroom
+                </button>
+                <button class="microsoft-btn" id="microsoftLoginBtn">
+                    <svg width="20" height="20" viewBox="0 0 23 23">
+                        <path fill="#f25022" d="M0 0h10.89v10.89H0z"/>
+                        <path fill="#00a4ef" d="M12.11 0H23v10.89H12.11z"/>
+                        <path fill="#7fba00" d="M0 12.11h10.89V23H0z"/>
+                        <path fill="#ffb900" d="M12.11 12.11H23V23H12.11z"/>
+                    </svg>
+                    Sign in with Microsoft Teams
+                </button>
+            </div>
+            <div id="errorMsg" class="error" style="display: none;"></div>
+        </div>
+
+        <!-- Assignments Screen -->
+        <div class="assignments-container" id="assignmentsScreen">
+            <div class="user-info">
+                <h2>Hello! 👋</h2>
+                <div class="connected-accounts" id="connectedAccounts"></div>
+                <button class="logout-btn" id="logoutBtn">Logout All</button>
+            </div>
+            
+            <div id="loadingMsg" class="loading" style="display: none;">
+                Loading your assignments...
+            </div>
+            
+            <div id="assignmentsList"></div>
+        </div>
+    </div>
+
+    <!-- Google API -->
+    <script src="https://accounts.google.com/gsi/client"></script>
+    
+    <!-- Microsoft MSAL -->
+    <script src="https://alcdn.msauth.net/browser/2.30.0/js/msal-browser.min.js"></script>
+
+    <script>
+        // ============================================
+        // CONFIGURATION
+        // ============================================
+        
+        // 🔧 TOGGLE MOCK DATA MODE
+        // Set to true: Use fake data for testing (no API calls, no admin approval needed)
+        // Set to false: Use real Microsoft Graph API and Google Classroom API
+        const USE_MOCK_DATA = true;
+        const USE_MOCK_DATA_GOOGLE = false
+        
+        // Google Configuration
+        const GOOGLE_CLIENT_ID = '204169741443-lrnat59d7ob8ae63srsbg2ojefn1f51h.apps.googleusercontent.com';
+        const GOOGLE_SCOPES = 'https://www.googleapis.com/auth/classroom.courses.readonly https://www.googleapis.com/auth/classroom.coursework.students.readonly https://www.googleapis.com/auth/classroom.student-submissions.students.readonly';
+
+        // Microsoft Configuration
+        const MICROSOFT_CLIENT_ID = '92dff588-50d7-44a0-b56d-41da102f914e';
+        const MICROSOFT_SCOPES = ['User.Read', 'EduAssignments.Read', 'EduAssignments.ReadBasic'];
+
+        // ============================================
+        // STATE MANAGEMENT
+        // ============================================
+        
+        let googleTokenClient;
+        let googleAccessToken = null;
+        let msalInstance;
+        let microsoftAccessToken = null;
+
+        // ============================================
+        // MOCK DATA
+        // ============================================
+
+        const MOCK_GOOGLE_ASSIGNMENTS = [
+            {
+                source: 'google',
+                title: 'Math Homework - Chapter 5: Quadratic Equations',
+                courseName: 'Advanced Mathematics',
+                dueDate: { year: 2025, month: 11, day: 5 },
+                dueTime: { hours: 23, minutes: 59 },
+                status: 'pending',
+                link: '#'
+            },
+            {
+                source: 'google',
+                title: 'Essay: Impact of Climate Change',
+                courseName: 'Environmental Science',
+                dueDate: { year: 2025, month: 11, day: 3 },
+                dueTime: { hours: 23, minutes: 59 },
+                status: 'late',
+                link: '#'
+            },
+            {
+                source: 'google',
+                title: 'Reading Quiz - Chapters 10-12',
+                courseName: 'English Literature',
+                dueDate: { year: 2025, month: 11, day: 8 },
+                dueTime: { hours: 14, minutes: 0 },
+                status: 'pending',
+                link: '#'
+            },
+            {
+                source: 'google',
+                title: 'Science Lab Report: Photosynthesis',
+                courseName: 'Biology',
+                dueDate: { year: 2025, month: 11, day: 10 },
+                dueTime: { hours: 23, minutes: 59 },
+                status: 'pending',
+                link: '#'
+            }
+        ];
+
+        // Mock Microsoft Teams assignments matching actual Graph API format
+        const MOCK_TEAMS_ASSIGNMENTS_RAW = [
+            {
+                id: "mock-assignment-1",
+                classId: "class-101",
+                displayName: "Lab Report: Chemical Reactions",
+                dueDateTime: "2025-11-04T23:59:00Z",
+                status: "assigned",
+                webUrl: "https://teams.microsoft.com/l/entity/66aeee93-507d-479a-a3ef-8f494af43945/classroom",
+                allowLateSubmissions: true,
+                createdDateTime: "2025-10-25T10:00:00Z"
+            },
+            {
+                id: "mock-assignment-2",
+                classId: "class-102",
+                displayName: "History Presentation: World War II",
+                dueDateTime: "2025-11-06T15:30:00Z",
+                status: "assigned",
+                webUrl: "https://teams.microsoft.com/l/entity/66aeee93-507d-479a-a3ef-8f494af43945/classroom",
+                allowLateSubmissions: false,
+                createdDateTime: "2025-10-20T09:00:00Z"
+            },
+            {
+                id: "mock-assignment-3",
+                classId: "class-103",
+                displayName: "Physics Problem Set #7",
+                dueDateTime: "2025-11-01T23:59:00Z",
+                status: "assigned",
+                webUrl: "https://teams.microsoft.com/l/entity/66aeee93-507d-479a-a3ef-8f494af43945/classroom",
+                allowLateSubmissions: true,
+                createdDateTime: "2025-10-15T14:00:00Z"
+            },
+            {
+                id: "mock-assignment-4",
+                classId: "class-104",
+                displayName: "Spanish Vocabulary Quiz",
+                dueDateTime: "2025-11-07T14:00:00Z",
+                status: "assigned",
+                webUrl: "https://teams.microsoft.com/l/entity/66aeee93-507d-479a-a3ef-8f494af43945/classroom",
+                allowLateSubmissions: false,
+                createdDateTime: "2025-10-28T11:00:00Z"
+            },
+            {
+                id: "mock-assignment-5",
+                classId: "class-105",
+                displayName: "Programming Project: Calculator App",
+                dueDateTime: "2025-11-12T23:59:00Z",
+                status: "assigned",
+                webUrl: "https://teams.microsoft.com/l/entity/66aeee93-507d-479a-a3ef-8f494af43945/classroom",
+                allowLateSubmissions: true,
+                createdDateTime: "2025-10-22T16:00:00Z"
+            }
+        ];
+
+        // Mock class data
+        const MOCK_TEAMS_CLASSES = {
+            "class-101": { displayName: "Chemistry 101" },
+            "class-102": { displayName: "World History" },
+            "class-103": { displayName: "Physics" },
+            "class-104": { displayName: "Spanish II" },
+            "class-105": { displayName: "Computer Science" }
+        };
+
+        // Mock submission data (to determine if student submitted)
+        const MOCK_TEAMS_SUBMISSIONS = {
+            "mock-assignment-1": { status: "working" }, // not submitted
+            "mock-assignment-2": { status: "working" },
+            "mock-assignment-3": { status: "working" }, // late
+            "mock-assignment-4": { status: "working" },
+            "mock-assignment-5": { status: "working" }
+        };
+
+        // ============================================
+        // INITIALIZATION
+        // ============================================
+
+        function updateModeIndicator() {
+            const indicator = document.getElementById('modeIndicator');
+            if (USE_MOCK_DATA) {
+                indicator.textContent = '🎭 MOCK DATA MODE - No API calls';
+                indicator.className = 'mode-indicator mock';
+            } else {
+                indicator.textContent = '🔒 LIVE MODE - Real API calls';
+                indicator.className = 'mode-indicator';
+            }
+        }
+
+        // ============================================
+        // GOOGLE CLASSROOM INTEGRATION
+        // ============================================
+
+        function initializeGoogleAuth() {
+            if (USE_MOCK_DATA_GOOGLE) {
+                console.log('📋 Mock mode enabled - Google auth will be simulated');
+                return;
+            }
+            console.log("JE")
+            googleTokenClient = google.accounts.oauth2.initTokenClient({
+                client_id: GOOGLE_CLIENT_ID,
+                scope: GOOGLE_SCOPES,
+                callback: handleGoogleAuthResponse,
+            });
+        }
+
+        function handleGoogleAuthResponse(response) {
+            if (response.error) {
+                showError('Google authentication failed: ' + response.error);
+                return;
+            }
+            
+            googleAccessToken = response.access_token;
+            updateConnectedAccounts();
+            showAssignmentsScreen();
+            loadAllAssignments();
+        }
+
+        async function loadGoogleAssignments() {
+            if (!googleAccessToken) return [];
+
+            // MOCK DATA MODE
+            if (USE_MOCK_DATA_GOOGLE) {
+                console.log('📋 Loading mock Google Classroom assignments');
+                // Simulate network dela
+                await new Promise(resolve => setTimeout(resolve, 500));
+                return MOCK_GOOGLE_ASSIGNMENTS;
+            }
+
+            // REAL API MODE - OPTIMIZED
+            try {
+                const coursesResponse = await fetch(
+                    'https://classroom.googleapis.com/v1/courses?courseStates=ACTIVE',
+                    { headers: { 'Authorization': `Bearer ${googleAccessToken}` }}
+                );
+
+                if (!coursesResponse.ok) throw new Error('Failed to fetch Google courses');
+
+                const coursesData = await coursesResponse.json();
+                const courses = coursesData.courses || [];
+                
+                // Process all courses in parallel
+                const coursePromises = courses.map(async (course) => {
+                    try {
+                        const courseworkResponse = await fetch(
+                            `https://classroom.googleapis.com/v1/courses/${course.id}/courseWork`,
+                            { headers: { 'Authorization': `Bearer ${googleAccessToken}` }}
+                        );
+
+                        if (!courseworkResponse.ok) return [];
+
+                        const courseworkData = await courseworkResponse.json();
+                        const coursework = courseworkData.courseWork || [];
+
+                        // Fetch all submissions for this course in parallel
+                        const assignmentPromises = coursework.map(async (work) => {
+                            try {
+                                const submissionResponse = await fetch(
+                                    `https://classroom.googleapis.com/v1/courses/${course.id}/courseWork/${work.id}/studentSubmissions`,
+                                    { headers: { 'Authorization': `Bearer ${googleAccessToken}` }}
+                                );
+
+                                let status = 'pending';
+                                if (submissionResponse.ok) {
+                                    const submissionData = await submissionResponse.json();
+                                    const submission = submissionData.studentSubmissions?.[0];
+                                    if (submission) {
+                                        status = submission.state === 'TURNED_IN' || submission.state === 'RETURNED' 
+                                            ? 'submitted' 
+                                            : submission.late ? 'late' : 'pending';
+                                    }
+                                }
+
+                                return {
+                                    source: 'google',
+                                    title: work.title,
+                                    courseName: course.name,
+                                    dueDate: work.dueDate,
+                                    dueTime: work.dueTime,
+                                    status: status,
+                                    link: work.alternateLink
+                                };
+                            } catch (error) {
+                                console.error(`Error loading submission for ${work.title}:`, error);
+                                return null;
+                            }
+                        });
+
+                        const assignments = await Promise.all(assignmentPromises);
+                        return assignments.filter(a => a !== null);
+                    } catch (error) {
+                        console.error(`Error loading Google coursework for ${course.name}:`, error);
+                        return [];
+                    }
+                });
+
+                const allCourseAssignments = await Promise.all(coursePromises);
+                return allCourseAssignments.flat();
+            } catch (error) {
+                console.error('Error loading Google assignments:', error);
+                return [];
+            }
+        }
+
+        // ============================================
+        // MICROSOFT TEAMS INTEGRATION
+        // ============================================
+
+        function initializeMicrosoftAuth() {
+            if (USE_MOCK_DATA) {
+                console.log('📋 Mock mode enabled - Microsoft auth will be simulated');
+                return;
+            }
+
+            const msalConfig = {
+                auth: {
+                    clientId: MICROSOFT_CLIENT_ID,
+                    authority: 'https://login.microsoftonline.com/common',
+                    redirectUri: window.location.origin
+                }
+            };
+
+            msalInstance = new msal.PublicClientApplication(msalConfig);
+        }
+
+        async function loginMicrosoft() {
+            // MOCK DATA MODE - Skip real authentication
+            if (USE_MOCK_DATA) {
+                console.log('📋 Mock mode: Simulating Microsoft login');
+                microsoftAccessToken = 'MOCK_TOKEN';
+                updateConnectedAccounts();
+                showAssignmentsScreen();
+                loadAllAssignments();
+                return;
+            }
+
+            // REAL API MODE
+            try {
+                const loginResponse = await msalInstance.loginPopup({
+                    scopes: MICROSOFT_SCOPES
+                });
+
+                microsoftAccessToken = loginResponse.accessToken;
+                updateConnectedAccounts();
+                showAssignmentsScreen();
+                loadAllAssignments();
+            } catch (error) {
+                showError('Microsoft authentication failed: ' + error.message);
+            }
+        }
+
+        async function loadTeamsAssignments() {
+            if (!microsoftAccessToken) return [];
+
+            // MOCK DATA MODE
+            if (USE_MOCK_DATA) {
+                console.log('📋 Loading mock Microsoft Teams assignments');
+                // Simulate network delay
+                await new Promise(resolve => setTimeout(resolve, 800));
+                
+                // Process mock data to match our app's format
+                const processedAssignments = MOCK_TEAMS_ASSIGNMENTS_RAW.map(assignment => {
+                    const className = MOCK_TEAMS_CLASSES[assignment.classId]?.displayName || 'Unknown Class';
+                    const submission = MOCK_TEAMS_SUBMISSIONS[assignment.id];
+                    
+                    // Determine status
+                    let status = 'pending';
+                    if (submission) {
+                        if (submission.status === 'submitted' || submission.status === 'returned') {
+                            status = 'submitted';
+                        } else {
+                            // Check if late
+                            const dueDate = new Date(assignment.dueDateTime);
+                            const now = new Date();
+                            if (now > dueDate) {
+                                status = 'late';
+                            }
+                        }
+                    }
+                    
+                    return {
+                        source: 'teams',
+                        title: assignment.displayName,
+                        courseName: className,
+                        dueDate: assignment.dueDateTime ? new Date(assignment.dueDateTime) : null,
+                        status: status,
+                        link: assignment.webUrl
+                    };
+                });
+                
+                return processedAssignments;
+            }
+
+            // REAL API MODE
+            try {
+                const classesResponse = await fetch(
+                    'https://graph.microsoft.com/v1.0/education/me/classes',
+                    { headers: { 'Authorization': `Bearer ${microsoftAccessToken}` }}
+                );
+
+                if (!classesResponse.ok) throw new Error('Failed to fetch Teams classes');
+
+                const classesData = await classesResponse.json();
+                const classes = classesData.value || [];
+                let allAssignments = [];
+
+                for (const classItem of classes) {
+                    try {
+                        const assignmentsResponse = await fetch(
+                            `https://graph.microsoft.com/v1.0/education/classes/${classItem.id}/assignments`,
+                            { headers: { 'Authorization': `Bearer ${microsoftAccessToken}` }}
+                        );
+
+                        if (assignmentsResponse.ok) {
+                            const assignmentsData = await assignmentsResponse.json();
+                            const assignments = assignmentsData.value || [];
+
+                            for (const assignment of assignments) {
+                                const submissionsResponse = await fetch(
+                                    `https://graph.microsoft.com/v1.0/education/classes/${classItem.id}/assignments/${assignment.id}/submissions`,
+                                    { headers: { 'Authorization': `Bearer ${microsoftAccessToken}` }}
+                                );
+
+                                let status = 'pending';
+                                if (submissionsResponse.ok) {
+                                    const submissionsData = await submissionsResponse.json();
+                                    const submission = submissionsData.value?.[0];
+                                    if (submission) {
+                                        if (submission.status === 'submitted' || submission.status === 'returned') {
+                                            status = 'submitted';
+                                        } else {
+                                            // Check if late
+                                            const dueDate = new Date(assignment.dueDateTime);
+                                            const now = new Date();
+                                            if (now > dueDate) {
+                                                status = 'late';
+                                            }
+                                        }
+                                    }
+                                }
+
+                                allAssignments.push({
+                                    source: 'teams',
+                                    title: assignment.displayName,
+                                    courseName: classItem.displayName,
+                                    dueDate: assignment.dueDateTime ? new Date(assignment.dueDateTime) : null,
+                                    status: status,
+                                    link: assignment.webUrl
+                                });
+                            }
+                        }
+                    } catch (error) {
+                        console.error(`Error loading Teams assignments for ${classItem.displayName}:`, error);
+                    }
+                }
+
+                return allAssignments;
+            } catch (error) {
+                console.error('Error loading Teams assignments:', error);
+                return [];
+            }
+        }
+
+        // ============================================
+        // COMBINED ASSIGNMENT DISPLAY
+        // ============================================
+
+        async function loadAllAssignments() {
+            const loadingMsg = document.getElementById('loadingMsg');
+            const assignmentsList = document.getElementById('assignmentsList');
+            
+            loadingMsg.style.display = 'block';
+            assignmentsList.innerHTML = '';
+
+            try {
+                const [googleAssignments, teamsAssignments] = await Promise.all([
+                    loadGoogleAssignments(),
+                    loadTeamsAssignments()
+                ]);
+
+                const allAssignments = [...googleAssignments, ...teamsAssignments];
+                displayAssignments(allAssignments);
+            } catch (error) {
+                showError('Failed to load assignments: ' + error.message);
+            } finally {
+                loadingMsg.style.display = 'none';
+            }
+        }
+
+        function displayAssignments(assignments) {
+            const assignmentsList = document.getElementById('assignmentsList');
+            
+            const pendingAssignments = assignments.filter(a => a.status !== 'submitted');
+            
+            if (pendingAssignments.length === 0) {
+                assignmentsList.innerHTML = `
+                    <div class="empty-state">
+                        <h3>🎉 All caught up!</h3>
+                        <p>You have no pending assignments.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            // Sort by due date
+            pendingAssignments.sort((a, b) => {
+                const dateA = a.source === 'google' ? parseGoogleDate(a.dueDate) : a.dueDate;
+                const dateB = b.source === 'google' ? parseGoogleDate(b.dueDate) : b.dueDate;
+                if (!dateA) return 1;
+                if (!dateB) return -1;
+                return dateA - dateB;
+            });
+
+            assignmentsList.innerHTML = pendingAssignments.map(assignment => {
+                const dueDate = formatDueDate(assignment);
+                const statusClass = `status-${assignment.status}`;
+                const statusText = assignment.status === 'late' ? 'Late' : 'Pending';
+                const sourceClass = assignment.source === 'google' ? 'source-google' : 'source-teams';
+                const sourceText = assignment.source === 'google' ? 'Google Classroom' : 'Microsoft Teams';
+                const cardClass = assignment.source === 'teams' ? 'assignment-card teams' : 'assignment-card';
+
+                return `
+                    <div class="${cardClass}">
+                        <span class="assignment-source ${sourceClass}">${sourceText}</span>
+                        <div class="assignment-course">${assignment.courseName}</div>
+                        <div class="assignment-title">${assignment.title}</div>
+                        <div class="assignment-due">📅 Due: ${dueDate}</div>
+                        <span class="assignment-status ${statusClass}">${statusText}</span>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function parseGoogleDate(dueDate) {
+            if (!dueDate) return null;
+            return new Date(dueDate.year, dueDate.month - 1, dueDate.day);
+        }
+
+        function formatDueDate(assignment) {
+            let date;
+            
+            if (assignment.source === 'google') {
+                if (!assignment.dueDate) return 'No due date';
+                date = parseGoogleDate(assignment.dueDate);
+            } else {
+                if (!assignment.dueDate) return 'No due date';
+                date = assignment.dueDate;
+            }
+            
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            
+            const diffTime = date - today;
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            
+            if (diffDays === 0) return 'Today';
+            if (diffDays === 1) return 'Tomorrow';
+            if (diffDays < 0) return `${Math.abs(diffDays)} days ago`;
+            if (diffDays < 7) return `In ${diffDays} days`;
+            
+            return date.toLocaleDateString();
+        }
+
+        // ============================================
+        // UI HELPERS
+        // ============================================
+
+        function updateConnectedAccounts() {
+            const container = document.getElementById('connectedAccounts');
+            let badges = [];
+
+            if (googleAccessToken) {
+                badges.push('<div class="account-badge">✓ Google Classroom</div>');
+            }
+            if (microsoftAccessToken) {
+                badges.push('<div class="account-badge microsoft">✓ Microsoft Teams</div>');
+            }
+
+            container.innerHTML = badges.join('');
+        }
+
+        function showAssignmentsScreen() {
+            document.getElementById('loginScreen').style.display = 'none';
+            document.getElementById('assignmentsScreen').classList.add('active');
+        }
+
+        function showLoginScreen() {
+            document.getElementById('loginScreen').style.display = 'block';
+            document.getElementById('assignmentsScreen').classList.remove('active');
+            googleAccessToken = null;
+            microsoftAccessToken = null;
+        }
+
+        function showError(message) {
+            const errorMsg = document.getElementById('errorMsg');
+            errorMsg.textContent = message;
+            errorMsg.style.display = 'block';
+        }
+
+        // ============================================
+        // EVENT LISTENERS
+        // ============================================
+
+        document.getElementById('googleLoginBtn').addEventListener('click', () => {
+            // In mock mode, directly handle "login"
+            if (USE_MOCK_DATA_GOOGLE) {
+                console.log('📋 Mock mode: Simulating Google login');
+                googleAccessToken = 'MOCK_TOKEN';
+                updateConnectedAccounts();
+                showAssignmentsScreen();
+                loadAllAssignments();
+                return;
+            }
+
+            // Real mode
+            if (!GOOGLE_CLIENT_ID.includes('YOUR_')) {
+                googleTokenClient.requestAccessToken();
+            } else {
+                showError('Please configure your Google Client ID first!');
+            }
+        });
+
+        document.getElementById('microsoftLoginBtn').addEventListener('click', () => {
+            loginMicrosoft();
+        });
+
+        document.getElementById('logoutBtn').addEventListener('click', () => {
+            showLoginScreen();
+        });
+
+        // ============================================
+        // INITIALIZE ON PAGE LOAD
+        // ============================================
+
+        window.addEventListener('DOMContentLoaded', () => {
+            updateModeIndicator();
+            initializeGoogleAuth();
+            initializeMicrosoftAuth();
+            
+            if (USE_MOCK_DATA) {
+                console.log('%c📋 MOCK DATA MODE ENABLED', 'background: #ffc107; color: #000; font-size: 16px; padding: 8px;');
+                console.log('No API calls will be made. All data is simulated.');
+                console.log('To use real APIs, set USE_MOCK_DATA = false in the code.');
+            } else {
+                console.log('%c🔒 LIVE MODE ENABLED', 'background: #4caf50; color: #fff; font-size: 16px; padding: 8px;');
+                console.log('Real API calls will be made. Admin approval required.');
+            }
+        });
+    </script>
+</body>
+</html>

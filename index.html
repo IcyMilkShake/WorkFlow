@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WorkFlow</title>
+    <title>WorkFlow - Assignment Tracker</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         * {
             margin: 0;
@@ -11,373 +12,800 @@
             box-sizing: border-box;
         }
 
+        :root {
+            --primary: #b66dff;
+            --primary-dark: #9946e6;
+            --secondary: #00d25b;
+            --warning: #ffab00;
+            --danger: #fc424a;
+            --info: #00d0ff;
+            --dark: #191c24;
+            --darker: #0f1015;
+            --card-bg: #1f2128;
+            --border-color: #2c2e33;
+            --text-primary: #ffffff;
+            --text-secondary: #adb5bd;
+            --text-muted: #6c757d;
+        }
+
+        /* Light Theme */
+        body.light-theme {
+            --dark: #f5f7fa;
+            --darker: #ffffff;
+            --card-bg: #ffffff;
+            --border-color: #e0e6ed;
+            --text-primary: #1a1a1a;
+            --text-secondary: #6c757d;
+            --text-muted: #9ca3af;
+        }
+
+        /* Midnight Theme */
+        body.midnight-theme {
+            --dark: #0a0e27;
+            --darker: #050816;
+            --card-bg: #0f1729;
+            --border-color: #1a1f3a;
+            --primary: #a78bfa;
+            --secondary: #34d399;
+        }
+
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 20px;
+            font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, sans-serif;
+            background: var(--dark);
+            color: var(--text-primary);
+            line-height: 1.6;
         }
 
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
+        /* Sidebar */
+        .sidebar {
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: 255px;
+            height: 100vh;
+            background: var(--darker);
+            border-right: 1px solid var(--border-color);
+            overflow-y: auto;
+            z-index: 100;
+            transition: all 0.3s;
         }
 
-        .header {
-            text-align: center;
-            color: white;
-            margin-bottom: 40px;
-        }
-
-        .header h1 {
-            font-size: 3em;
-            margin-bottom: 10px;
-        }
-
-        .header p {
-            font-size: 1.2em;
-            opacity: 0.9;
-        }
-
-        .mode-indicator {
-            background: rgba(255, 255, 255, 0.2);
-            color: white;
-            padding: 10px 20px;
-            border-radius: 20px;
-            display: inline-block;
-            margin-top: 10px;
-            font-size: 0.9em;
-            font-weight: 600;
-        }
-
-        .mode-indicator.mock {
-            background: #ffc107;
-            color: #000;
-        }
-
-        .login-card {
-            background: white;
-            border-radius: 20px;
-            padding: 40px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            text-align: center;
-        }
-
-        .login-buttons {
+        .sidebar-brand {
+            padding: 1.5rem 1.875rem;
             display: flex;
-            flex-direction: column;
-            gap: 15px;
-            margin-top: 20px;
+            align-items: center;
+            gap: 0.75rem;
+            border-bottom: 1px solid var(--border-color);
         }
 
-        .google-btn, .microsoft-btn {
-            background: white;
-            border: 2px solid #4285f4;
-            color: #4285f4;
-            padding: 15px 30px;
-            font-size: 16px;
-            border-radius: 10px;
+        .sidebar-brand-icon {
+            font-size: 2rem;
+        }
+
+        .sidebar-brand-text {
+            font-size: 1.5rem;
+            font-weight: 700;
+            -webkit-background-clip: text;
+            color: #ffab00;
+            background-clip: text;
+        }
+
+        .sidebar-menu {
+            padding: 1.5rem 0;
+        }
+
+        .sidebar-menu-item {
+            padding: 0.75rem 1.875rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: all 0.3s;
             cursor: pointer;
-            display: inline-flex;
+            border-left: 3px solid transparent;
+        }
+
+        .sidebar-menu-item:hover {
+            color: var(--text-primary);
+            background: rgba(182, 109, 255, 0.1);
+        }
+
+        .sidebar-menu-item.active {
+            color: var(--text-primary);
+            background: rgba(182, 109, 255, 0.1);
+            border-left-color: var(--primary);
+        }
+
+        .sidebar-menu-icon {
+            font-size: 1.2rem;
+            width: 20px;
+        }
+
+        /* Main Content */
+        .main-panel {
+            margin-left: 255px;
+            min-height: 100vh;
+            background: var(--dark);
+            transition: all 0.3s;
+        }
+
+        /* Navbar */
+        .navbar {
+            background: var(--card-bg);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            z-index: 50;
+        }
+
+        .navbar-left h4 {
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .navbar-right {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+        }
+
+        .user-profile {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            cursor: pointer;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            transition: all 0.3s;
+        }
+
+        .user-profile:hover {
+            background: rgba(182, 109, 255, 0.1);
+        }
+
+        .user-avatar {
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            display: flex;
             align-items: center;
             justify-content: center;
-            gap: 10px;
-            transition: all 0.3s;
             font-weight: 600;
         }
 
-        .microsoft-btn {
-            border-color: #00a4ef;
-            color: #00a4ef;
+        .user-name {
+            font-size: 0.875rem;
+            font-weight: 500;
         }
 
-        .google-btn:hover {
-            background: #4285f4;
+        .badge {
+            background: var(--secondary);
             color: white;
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(66, 133, 244, 0.4);
+            padding: 0.25rem 0.5rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
         }
 
-        .microsoft-btn:hover {
-            background: #00a4ef;
-            color: white;
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(0, 164, 239, 0.4);
+        /* Content Area */
+        .content-wrapper {
+            padding: 2rem;
         }
 
-        .btn-disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
+        /* Page Header */
+        .page-header {
+            margin-bottom: 2rem;
         }
 
-        .assignments-container {
-            display: none;
+        .page-header h3 {
+            font-size: 1.75rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
         }
 
-        .assignments-container.active {
-            display: block;
-        }
-
-        .user-info {
-            background: white;
-            border-radius: 15px;
-            padding: 20px;
-            margin-bottom: 20px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-        }
-
-        .user-info h2 {
-            color: #333;
-            margin-bottom: 10px;
-        }
-
-        .connected-accounts {
+        .breadcrumb {
             display: flex;
-            gap: 10px;
-            margin-bottom: 15px;
-            flex-wrap: wrap;
+            gap: 0.5rem;
+            color: var(--text-muted);
+            font-size: 0.875rem;
         }
 
-        .account-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 5px;
-            background: #e8f5e9;
-            color: #2e7d32;
-            padding: 8px 15px;
-            border-radius: 20px;
-            font-size: 0.9em;
-            font-weight: 600;
-        }
-
-        .account-badge.microsoft {
-            background: #e3f2fd;
-            color: #1565c0;
-        }
-
-        .logout-btn {
-            background: #dc3545;
-            color: white;
-            border: none;
-            padding: 10px 20px;
+        /* Cards */
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
             border-radius: 8px;
-            cursor: pointer;
-            font-weight: 600;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
             transition: all 0.3s;
         }
 
-        .logout-btn:hover {
-            background: #c82333;
-            transform: translateY(-2px);
+        .card:hover {
+            border-color: var(--primary);
+            box-shadow: 0 10px 30px rgba(182, 109, 255, 0.15);
+        }
+
+        .card-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+
+        /* Stats Cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.3s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .stat-info h3 {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 0.25rem;
+        }
+
+        .stat-label {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+
+        .stat-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+        }
+
+        .stat-card.primary .stat-icon {
+            background: rgba(182, 109, 255, 0.2);
+            color: var(--primary);
+        }
+
+        .stat-card.success .stat-icon {
+            background: rgba(0, 210, 91, 0.2);
+            color: var(--secondary);
+        }
+
+        .stat-card.warning .stat-icon {
+            background: rgba(255, 171, 0, 0.2);
+            color: var(--warning);
+        }
+
+        .stat-card.danger .stat-icon {
+            background: rgba(252, 66, 74, 0.2);
+            color: var(--danger);
+        }
+
+        /* Assignment Cards */
+        .assignments-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 1.5rem;
         }
 
         .assignment-card {
-            background: white;
-            border-radius: 15px;
-            padding: 20px;
-            margin-bottom: 15px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-            border-left: 5px solid #667eea;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-left: 4px solid var(--primary);
+            border-radius: 8px;
+            padding: 1.5rem;
             transition: all 0.3s;
-        }
-
-        .assignment-card.teams {
-            border-left-color: #00a4ef;
+            cursor: pointer;
         }
 
         .assignment-card:hover {
             transform: translateX(5px);
-            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+            box-shadow: 0 10px 30px rgba(182, 109, 255, 0.2);
         }
 
-        .assignment-source {
-            display: inline-block;
-            padding: 4px 10px;
+        .assignment-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 1rem;
+        }
+
+        .assignment-badge {
+            background: rgba(182, 109, 255, 0.2);
+            color: var(--primary);
+            padding: 0.25rem 0.75rem;
             border-radius: 12px;
-            font-size: 0.75em;
-            font-weight: 700;
-            margin-bottom: 8px;
+            font-size: 0.75rem;
+            font-weight: 600;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .source-google {
-            background: #e8f4fd;
-            color: #1967d2;
-        }
-
-        .source-teams {
-            background: #e3f2fd;
-            color: #0078d4;
         }
 
         .assignment-title {
-            font-size: 1.3em;
-            color: #333;
-            margin-bottom: 10px;
+            font-size: 1.125rem;
             font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: var(--text-primary);
         }
 
         .assignment-course {
-            color: #667eea;
-            font-weight: 600;
-            margin-bottom: 8px;
+            color: var(--primary);
+            font-weight: 500;
+            margin-bottom: 0.75rem;
+            font-size: 0.875rem;
         }
 
-        .assignment-due {
-            color: #666;
-            font-size: 0.9em;
+        .assignment-meta {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            color: var(--text-secondary);
+            font-size: 0.875rem;
         }
 
         .assignment-status {
-            display: inline-block;
-            padding: 5px 15px;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
             border-radius: 20px;
-            font-size: 0.85em;
+            font-size: 0.875rem;
             font-weight: 600;
-            margin-top: 10px;
         }
 
-        .status-pending {
-            background: #fff3cd;
-            color: #856404;
+        .assignment-status.pending {
+            background: rgba(255, 171, 0, 0.2);
+            color: var(--warning);
         }
 
-        .status-late {
-            background: #f8d7da;
-            color: #721c24;
+        .assignment-status.late {
+            background: rgba(252, 66, 74, 0.2);
+            color: var(--danger);
         }
 
-        .status-submitted {
-            background: #d4edda;
-            color: #155724;
+        /* Login Page */
+        .auth-page {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background: var(--dark);
+            padding: 2rem;
         }
 
-        .loading {
+        .auth-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 3rem;
+            max-width: 500px;
+            width: 100%;
             text-align: center;
-            color: white;
-            font-size: 1.2em;
-            padding: 40px;
         }
 
-        .error {
-            background: #f8d7da;
-            color: #721c24;
-            padding: 15px;
-            border-radius: 10px;
-            margin: 20px 0;
-            border-left: 4px solid #dc3545;
+        .auth-card h2 {
+            font-size: 2rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .auth-card p {
+            color: var(--text-secondary);
+            margin-bottom: 2rem;
+        }
+
+        .btn {
+            padding: 0.875rem 2rem;
+            border-radius: 8px;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 0.875rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+        }
+
+        .btn-google {
+            background: white;
+            color: #333;
+            width: 100%;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .btn-google:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+        }
+
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #e63946;
+        }
+
+        .mode-indicator {
+            margin-top: 1.5rem;
+            padding: 0.75rem;
+            background: rgba(255, 171, 0, 0.1);
+            border-radius: 8px;
+            color: var(--warning);
+            font-size: 0.875rem;
+            font-weight: 600;
         }
 
         .empty-state {
             text-align: center;
-            padding: 60px 20px;
-            color: #666;
-            background: white;
-            border-radius: 15px;
+            padding: 4rem 2rem;
+            background: var(--card-bg);
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+
+        .empty-state-icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
         }
 
         .empty-state h3 {
-            font-size: 1.5em;
-            margin-bottom: 10px;
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .empty-state p {
+            color: var(--text-secondary);
+        }
+
+        .loading {
+            text-align: center;
+            padding: 4rem;
+            color: var(--text-secondary);
+        }
+
+        .error {
+            background: rgba(252, 66, 74, 0.1);
+            color: var(--danger);
+            padding: 1rem;
+            border-radius: 8px;
+            margin-top: 1rem;
+            border-left: 4px solid var(--danger);
+        }
+
+        /* Responsive */
+        @media (max-width: 991px) {
+            .sidebar {
+                transform: translateX(-100%);
+            }
+
+            .main-panel {
+                margin-left: 0;
+            }
+
+            .assignments-grid {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>📊 WorkFlow</h1>
-            <p>Track all your assignments in one place</p>
-            <div class="mode-indicator" id="modeIndicator"></div>
-        </div>
-
-        <!-- Login Screen -->
-        <div class="login-card" id="loginScreen">
-            <h2 style="margin-bottom: 20px; color: #333;">Welcome to WorkFlow</h2>
-            <p style="color: #666; margin-bottom: 30px;">Connect your accounts to see your assignments</p>
-            <div class="login-buttons">
-                <button class="google-btn" id="googleLoginBtn">
-                    <svg width="20" height="20" viewBox="0 0 20 20">
-                        <path fill="#4285f4" d="M19.6 10.23c0-.82-.1-1.42-.25-2.05H10v3.72h5.5c-.15.96-.74 2.31-2.04 3.22v2.45h3.16c1.89-1.73 2.98-4.3 2.98-7.34z"/>
-                        <path fill="#34a853" d="M13.46 15.13c-.83.59-1.96 1-3.46 1-2.64 0-4.88-1.74-5.68-4.15H1.07v2.52C2.72 17.75 6.09 20 10 20c2.7 0 4.96-.89 6.62-2.42l-3.16-2.45z"/>
-                        <path fill="#fbbc05" d="M3.99 10c0-.69.12-1.35.32-1.97V5.51H1.07A9.973 9.973 0 000 10c0 1.61.39 3.14 1.07 4.49l3.24-2.52c-.2-.62-.32-1.28-.32-1.97z"/>
-                        <path fill="#ea4335" d="M10 3.88c1.88 0 3.13.81 3.85 1.48l2.84-2.76C14.96.99 12.7 0 10 0 6.09 0 2.72 2.25 1.07 5.51l3.24 2.52C5.12 5.62 7.36 3.88 10 3.88z"/>
-                    </svg>
-                    Sign in with Google Classroom
-                </button>
-                <button class="microsoft-btn" id="microsoftLoginBtn">
-                    <svg width="20" height="20" viewBox="0 0 23 23">
-                        <path fill="#f25022" d="M0 0h10.89v10.89H0z"/>
-                        <path fill="#00a4ef" d="M12.11 0H23v10.89H12.11z"/>
-                        <path fill="#7fba00" d="M0 12.11h10.89V23H0z"/>
-                        <path fill="#ffb900" d="M12.11 12.11H23V23H12.11z"/>
-                    </svg>
-                    Sign in with Microsoft Teams
-                </button>
-            </div>
+    <!-- Login Page -->
+    <div class="auth-page" id="loginPage">
+        <div class="auth-card">
+            <div class="sidebar-brand-icon">📊</div>
+            <h2>WorkFlow</h2>
+            <p>Track all your Google Classroom assignments in one beautiful dashboard</p>
+            
+            <button class="btn btn-google" id="googleLoginBtn">
+                <svg width="20" height="20" viewBox="0 0 20 20">
+                    <path fill="#4285f4" d="M19.6 10.23c0-.82-.1-1.42-.25-2.05H10v3.72h5.5c-.15.96-.74 2.31-2.04 3.22v2.45h3.16c1.89-1.73 2.98-4.3 2.98-7.34z"/>
+                    <path fill="#34a853" d="M13.46 15.13c-.83.59-1.96 1-3.46 1-2.64 0-4.88-1.74-5.68-4.15H1.07v2.52C2.72 17.75 6.09 20 10 20c2.7 0 4.96-.89 6.62-2.42l-3.16-2.45z"/>
+                    <path fill="#fbbc05" d="M3.99 10c0-.69.12-1.35.32-1.97V5.51H1.07A9.973 9.973 0 000 10c0 1.61.39 3.14 1.07 4.49l3.24-2.52c-.2-.62-.32-1.28-.32-1.97z"/>
+                    <path fill="#ea4335" d="M10 3.88c1.88 0 3.13.81 3.85 1.48l2.84-2.76C14.96.99 12.7 0 10 0 6.09 0 2.72 2.25 1.07 5.51l3.24 2.52C5.12 5.62 7.36 3.88 10 3.88z"/>
+                </svg>
+                Sign in with Google Classroom
+            </button>
+            
+            <div class="mode-indicator" id="modeIndicator">🎭 Mock Data Mode - No API calls required</div>
             <div id="errorMsg" class="error" style="display: none;"></div>
         </div>
+    </div>
 
-        <!-- Assignments Screen -->
-        <div class="assignments-container" id="assignmentsScreen">
-            <div class="user-info">
-                <h2>Hello! 👋</h2>
-                <div class="connected-accounts" id="connectedAccounts"></div>
-                <button class="logout-btn" id="logoutBtn">Logout All</button>
+    <!-- Dashboard -->
+    <div id="dashboardPage" style="display: none;">
+        <!-- Sidebar -->
+        <nav class="sidebar">
+            <div class="sidebar-brand">
+                <span class="sidebar-brand-icon">📊</span>
+                <span class="sidebar-brand-text">WorkFlow</span>
             </div>
-            
-            <div id="loadingMsg" class="loading" style="display: none;">
-                Loading your assignments...
+            <div class="sidebar-menu">
+                <a class="sidebar-menu-item active" onclick="showPage('assignments')">
+                    <span class="sidebar-menu-icon">📝</span>
+                    <span>Assignments</span>
+                </a>
+                <a class="sidebar-menu-item" onclick="showPage('statistics')">
+                    <span class="sidebar-menu-icon">📊</span>
+                    <span>Statistics</span>
+                </a>
+                <a class="sidebar-menu-item" onclick="showPage('courses')">
+                    <span class="sidebar-menu-icon">📚</span>
+                    <span>Courses</span>
+                </a>
+                <a class="sidebar-menu-item" onclick="showPage('settings')">
+                    <span class="sidebar-menu-icon">⚙️</span>
+                    <span>Settings</span>
+                </a>
             </div>
-            
-            <div id="assignmentsList"></div>
+        </nav>
+
+        <!-- Main Panel -->
+        <div class="main-panel">
+            <!-- Navbar -->
+            <div class="navbar">
+                <div class="navbar-left">
+                    <h4>Dashboard</h4>
+                </div>
+                <div class="navbar-right">
+                    <div class="user-profile">
+                        <div class="user-avatar"></div>
+                        <div>
+                            <div class="user-name"></div>
+                            <div class="badge">Connected</div>
+                        </div>
+                    </div>
+                    <button class="btn btn-danger" id="logoutBtn" style="padding: 0.5rem 1rem;">Logout</button>
+                </div>
+            </div>
+
+            <!-- Content -->
+            <div class="content-wrapper">
+                <!-- Assignments Page -->
+                <div id="assignmentsPage">
+                    <!-- Page Header -->
+                    <div class="page-header">
+                        <h3>My Assignments</h3>
+                        <div class="breadcrumb">
+                            <span>Home</span>
+                            <span>/</span>
+                            <span>Assignments</span>
+                        </div>
+                    </div>
+
+                    <!-- Stats Grid -->
+                    <div class="stats-grid" id="statsGrid">
+                        <div class="stat-card primary">
+                            <div class="stat-info">
+                                <h3 id="totalCount">0</h3>
+                                <div class="stat-label">Total Assignments</div>
+                            </div>
+                            <div class="stat-icon">📚</div>
+                        </div>
+                        <div class="stat-card warning">
+                            <div class="stat-info">
+                                <h3 id="pendingCount">0</h3>
+                                <div class="stat-label">Pending</div>
+                            </div>
+                            <div class="stat-icon">⏳</div>
+                        </div>
+                        <div class="stat-card danger">
+                            <div class="stat-info">
+                                <h3 id="lateCount">0</h3>
+                                <div class="stat-label">Late</div>
+                            </div>
+                            <div class="stat-icon">⚠️</div>
+                        </div>
+                        <div class="stat-card success">
+                            <div class="stat-info">
+                                <h3 id="dueToday">0</h3>
+                                <div class="stat-label">Due Today</div>
+                            </div>
+                            <div class="stat-icon">🎯</div>
+                        </div>
+                    </div>
+
+                    <!-- Loading State -->
+                    <div id="loadingMsg" class="loading" style="display: none;">
+                        Loading your assignments...
+                    </div>
+
+                    <!-- Assignments Grid -->
+                    <div class="assignments-grid" id="assignmentsList"></div>
+                </div>
+
+                <!-- Statistics Page -->
+                <div id="statisticsPage" style="display: none;">
+                    <!-- Page Header -->
+                    <div class="page-header">
+                        <h3>Statistics & Analytics</h3>
+                        <div class="breadcrumb">
+                            <span>Home</span>
+                            <span>/</span>
+                            <span>Statistics</span>
+                        </div>
+                    </div>
+
+                    <!-- Stats Overview -->
+                    <div class="stats-grid">
+                        <div class="stat-card warning">
+                            <div class="stat-info">
+                                <h3 id="upcomingWeek">0</h3>
+                                <div class="stat-label">Due This Week</div>
+                            </div>
+                            <div class="stat-icon">📅</div>
+                        </div>
+                        <div class="stat-card danger">
+                            <div class="stat-info">
+                                <h3 id="overdueTotal">0</h3>
+                                <div class="stat-label">Total Overdue</div>
+                            </div>
+                            <div class="stat-icon">🚨</div>
+                        </div>
+                        <div class="stat-card primary">
+                            <div class="stat-info">
+                                <h3 id="totalCourses">0</h3>
+                                <div class="stat-label">Active Courses</div>
+                            </div>
+                            <div class="stat-icon">📚</div>
+                        </div>
+                        <div class="stat-card success">
+                            <div class="stat-info">
+                                <h3 id="avgPerCourse">0</h3>
+                                <div class="stat-label">Avg per Course</div>
+                            </div>
+                            <div class="stat-icon">📊</div>
+                        </div>
+                    </div>
+
+                    <!-- Charts Row -->
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
+                        <!-- Status Distribution -->
+                        <div class="card">
+                            <div class="card-title">Assignment Status Distribution</div>
+                            <canvas id="statusChart" style="max-height: 300px;"></canvas>
+                        </div>
+
+                        <!-- Course Breakdown -->
+                        <div class="card">
+                            <div class="card-title">Assignments by Course</div>
+                            <canvas id="courseChart" style="max-height: 300px;"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Upcoming Deadlines -->
+                    <div class="card">
+                        <div class="card-title">📅 Upcoming Deadlines (Next 7 Days)</div>
+                        <div id="upcomingDeadlines" style="margin-top: 1rem;"></div>
+                    </div>
+                </div>
+
+                <!-- Courses Page -->
+                <div id="coursesPage" style="display: none;">
+                    <!-- Page Header -->
+                    <div class="page-header">
+                        <h3>My Courses</h3>
+                        <div class="breadcrumb">
+                            <span>Home</span>
+                            <span>/</span>
+                            <span>Courses</span>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-title">📚 Manage Your Courses</div>
+                        <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">Uncheck courses you want to ignore. They won't appear in assignments or statistics.</p>
+                        <div id="coursesList"></div>
+                    </div>
+                </div>
+
+                <!-- Settings Page -->
+                <div id="settingsPage" style="display: none;">
+                    <!-- Page Header -->
+                    <div class="page-header">
+                        <h3>Settings</h3>
+                        <div class="breadcrumb">
+                            <span>Home</span>
+                            <span>/</span>
+                            <span>Settings</span>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-title">🎨 Appearance</div>
+                        <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">Choose your preferred theme</p>
+                        
+                        <div style="display: grid; gap: 1rem;">
+                            <label style="display: flex; align-items: center; gap: 1rem; padding: 1rem; background: rgba(182, 109, 255, 0.05); border-radius: 8px; cursor: pointer; border: 2px solid transparent; transition: all 0.3s;" class="theme-option" data-theme="dark">
+                                <input type="radio" name="theme" value="dark" style="width: 20px; height: 20px; cursor: pointer;">
+                                <div>
+                                    <div style="font-weight: 600; margin-bottom: 0.25rem;">🌙 Dark Mode</div>
+                                    <div style="font-size: 0.875rem; color: var(--text-secondary);">Default dark theme with purple accents</div>
+                                </div>
+                            </label>
+
+                            <label style="display: flex; align-items: center; gap: 1rem; padding: 1rem; background: rgba(182, 109, 255, 0.05); border-radius: 8px; cursor: pointer; border: 2px solid transparent; transition: all 0.3s;" class="theme-option" data-theme="midnight">
+                                <input type="radio" name="theme" value="midnight" style="width: 20px; height: 20px; cursor: pointer;">
+                                <div>
+                                    <div style="font-weight: 600; margin-bottom: 0.25rem;">🌌 Midnight Mode</div>
+                                    <div style="font-size: 0.875rem; color: var(--text-secondary);">Deeper blacks for OLED screens</div>
+                                </div>
+                            </label>
+
+                            <label style="display: flex; align-items: center; gap: 1rem; padding: 1rem; background: rgba(182, 109, 255, 0.05); border-radius: 8px; cursor: pointer; border: 2px solid transparent; transition: all 0.3s;" class="theme-option" data-theme="light">
+                                <input type="radio" name="theme" value="light" style="width: 20px; height: 20px; cursor: pointer;">
+                                <div>
+                                    <div style="font-weight: 600; margin-bottom: 0.25rem;">☀️ Light Mode</div>
+                                    <div style="font-size: 0.875rem; color: var(--text-secondary);">Bright theme for daytime use</div>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
     <!-- Google API -->
     <script src="https://accounts.google.com/gsi/client"></script>
-    
-    <!-- Microsoft MSAL -->
-    <script src="https://alcdn.msauth.net/browser/2.30.0/js/msal-browser.min.js"></script>
+    <!-- Chart.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
 
     <script>
-        // ============================================
-        // CONFIGURATION
-        // ============================================
-        
-        // 🔧 TOGGLE MOCK DATA MODE
-        // Set to true: Use fake data for testing (no API calls, no admin approval needed)
-        // Set to false: Use real Microsoft Graph API and Google Classroom API
-        const USE_MOCK_DATA = true;
-        const USE_MOCK_DATA_GOOGLE = false
-        
-        // Google Configuration
+        // Configuration
+        const USE_MOCK_DATA = false;
         const GOOGLE_CLIENT_ID = '204169741443-lrnat59d7ob8ae63srsbg2ojefn1f51h.apps.googleusercontent.com';
-        const GOOGLE_SCOPES = 'https://www.googleapis.com/auth/classroom.courses.readonly https://www.googleapis.com/auth/classroom.coursework.students.readonly https://www.googleapis.com/auth/classroom.student-submissions.students.readonly';
+        const GOOGLE_SCOPES = 'https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/classroom.courses.readonly https://www.googleapis.com/auth/classroom.coursework.students.readonly https://www.googleapis.com/auth/classroom.student-submissions.students.readonly';
 
-        // Microsoft Configuration
-        const MICROSOFT_CLIENT_ID = '92dff588-50d7-44a0-b56d-41da102f914e';
-        const MICROSOFT_SCOPES = ['User.Read', 'EduAssignments.Read', 'EduAssignments.ReadBasic'];
-
-        // ============================================
-        // STATE MANAGEMENT
-        // ============================================
-        
         let googleTokenClient;
         let googleAccessToken = null;
-        let msalInstance;
-        let microsoftAccessToken = null;
+        let allAssignmentsData = [];
+        let statusChartInstance = null;
+        let courseChartInstance = null;
+        let allCoursesData = [];
+        let ignoredCourses = new Set(JSON.parse(localStorage.getItem('ignoredCourses') || '[]'));
+        let currentTheme = localStorage.getItem('theme') || 'dark';
 
-        // ============================================
-        // MOCK DATA
-        // ============================================
-
+        // Mock Data
         const MOCK_GOOGLE_ASSIGNMENTS = [
             {
                 source: 'google',
                 title: 'Math Homework - Chapter 5: Quadratic Equations',
                 courseName: 'Advanced Mathematics',
-                dueDate: { year: 2025, month: 11, day: 5 },
+                dueDate: { year: 2025, month: 11, day: 15 },
                 dueTime: { hours: 23, minutes: 59 },
                 status: 'pending',
                 link: '#'
@@ -386,7 +814,7 @@
                 source: 'google',
                 title: 'Essay: Impact of Climate Change',
                 courseName: 'Environmental Science',
-                dueDate: { year: 2025, month: 11, day: 3 },
+                dueDate: { year: 2025, month: 11, day: 14 },
                 dueTime: { hours: 23, minutes: 59 },
                 status: 'late',
                 link: '#'
@@ -395,7 +823,7 @@
                 source: 'google',
                 title: 'Reading Quiz - Chapters 10-12',
                 courseName: 'English Literature',
-                dueDate: { year: 2025, month: 11, day: 8 },
+                dueDate: { year: 2025, month: 11, day: 20 },
                 dueTime: { hours: 14, minutes: 0 },
                 status: 'pending',
                 link: '#'
@@ -404,110 +832,38 @@
                 source: 'google',
                 title: 'Science Lab Report: Photosynthesis',
                 courseName: 'Biology',
-                dueDate: { year: 2025, month: 11, day: 10 },
+                dueDate: { year: 2025, month: 11, day: 22 },
+                dueTime: { hours: 23, minutes: 59 },
+                status: 'pending',
+                link: '#'
+            },
+            {
+                source: 'google',
+                title: 'History Project: Ancient Civilizations',
+                courseName: 'World History',
+                dueDate: { year: 2025, month: 11, day: 25 },
+                dueTime: { hours: 23, minutes: 59 },
+                status: 'pending',
+                link: '#'
+            },
+            {
+                source: 'google',
+                title: 'Physics Problem Set #7',
+                courseName: 'Physics',
+                dueDate: { year: 2025, month: 11, day: 15 },
                 dueTime: { hours: 23, minutes: 59 },
                 status: 'pending',
                 link: '#'
             }
         ];
 
-        // Mock Microsoft Teams assignments matching actual Graph API format
-        const MOCK_TEAMS_ASSIGNMENTS_RAW = [
-            {
-                id: "mock-assignment-1",
-                classId: "class-101",
-                displayName: "Lab Report: Chemical Reactions",
-                dueDateTime: "2025-11-04T23:59:00Z",
-                status: "assigned",
-                webUrl: "https://teams.microsoft.com/l/entity/66aeee93-507d-479a-a3ef-8f494af43945/classroom",
-                allowLateSubmissions: true,
-                createdDateTime: "2025-10-25T10:00:00Z"
-            },
-            {
-                id: "mock-assignment-2",
-                classId: "class-102",
-                displayName: "History Presentation: World War II",
-                dueDateTime: "2025-11-06T15:30:00Z",
-                status: "assigned",
-                webUrl: "https://teams.microsoft.com/l/entity/66aeee93-507d-479a-a3ef-8f494af43945/classroom",
-                allowLateSubmissions: false,
-                createdDateTime: "2025-10-20T09:00:00Z"
-            },
-            {
-                id: "mock-assignment-3",
-                classId: "class-103",
-                displayName: "Physics Problem Set #7",
-                dueDateTime: "2025-11-01T23:59:00Z",
-                status: "assigned",
-                webUrl: "https://teams.microsoft.com/l/entity/66aeee93-507d-479a-a3ef-8f494af43945/classroom",
-                allowLateSubmissions: true,
-                createdDateTime: "2025-10-15T14:00:00Z"
-            },
-            {
-                id: "mock-assignment-4",
-                classId: "class-104",
-                displayName: "Spanish Vocabulary Quiz",
-                dueDateTime: "2025-11-07T14:00:00Z",
-                status: "assigned",
-                webUrl: "https://teams.microsoft.com/l/entity/66aeee93-507d-479a-a3ef-8f494af43945/classroom",
-                allowLateSubmissions: false,
-                createdDateTime: "2025-10-28T11:00:00Z"
-            },
-            {
-                id: "mock-assignment-5",
-                classId: "class-105",
-                displayName: "Programming Project: Calculator App",
-                dueDateTime: "2025-11-12T23:59:00Z",
-                status: "assigned",
-                webUrl: "https://teams.microsoft.com/l/entity/66aeee93-507d-479a-a3ef-8f494af43945/classroom",
-                allowLateSubmissions: true,
-                createdDateTime: "2025-10-22T16:00:00Z"
-            }
-        ];
-
-        // Mock class data
-        const MOCK_TEAMS_CLASSES = {
-            "class-101": { displayName: "Chemistry 101" },
-            "class-102": { displayName: "World History" },
-            "class-103": { displayName: "Physics" },
-            "class-104": { displayName: "Spanish II" },
-            "class-105": { displayName: "Computer Science" }
-        };
-
-        // Mock submission data (to determine if student submitted)
-        const MOCK_TEAMS_SUBMISSIONS = {
-            "mock-assignment-1": { status: "working" }, // not submitted
-            "mock-assignment-2": { status: "working" },
-            "mock-assignment-3": { status: "working" }, // late
-            "mock-assignment-4": { status: "working" },
-            "mock-assignment-5": { status: "working" }
-        };
-
-        // ============================================
-        // INITIALIZATION
-        // ============================================
-
-        function updateModeIndicator() {
-            const indicator = document.getElementById('modeIndicator');
-            if (USE_MOCK_DATA) {
-                indicator.textContent = '🎭 MOCK DATA MODE - No API calls';
-                indicator.className = 'mode-indicator mock';
-            } else {
-                indicator.textContent = '🔒 LIVE MODE - Real API calls';
-                indicator.className = 'mode-indicator';
-            }
-        }
-
-        // ============================================
-        // GOOGLE CLASSROOM INTEGRATION
-        // ============================================
-
+        // Initialize Google Auth
         function initializeGoogleAuth() {
-            if (USE_MOCK_DATA_GOOGLE) {
-                console.log('📋 Mock mode enabled - Google auth will be simulated');
+            if (USE_MOCK_DATA) {
+                console.log('📋 Mock mode enabled');
                 return;
             }
-            console.log("JE")
+
             googleTokenClient = google.accounts.oauth2.initTokenClient({
                 client_id: GOOGLE_CLIENT_ID,
                 scope: GOOGLE_SCOPES,
@@ -522,35 +878,55 @@
             }
             
             googleAccessToken = response.access_token;
-            updateConnectedAccounts();
-            showAssignmentsScreen();
-            loadAllAssignments();
+            showDashboard();
+            loadAssignments();
         }
 
-        async function loadGoogleAssignments() {
-            if (!googleAccessToken) return [];
+        // Load Assignments
+        async function loadAssignments() {
+            const loadingMsg = document.getElementById('loadingMsg');
+            const assignmentsList = document.getElementById('assignmentsList');
+            
+            loadingMsg.style.display = 'block';
+            assignmentsList.innerHTML = '';
 
-            // MOCK DATA MODE
-            if (USE_MOCK_DATA_GOOGLE) {
-                console.log('📋 Loading mock Google Classroom assignments');
-                // Simulate network dela
-                await new Promise(resolve => setTimeout(resolve, 500));
-                return MOCK_GOOGLE_ASSIGNMENTS;
+            if (USE_MOCK_DATA) {
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                allAssignmentsData = MOCK_GOOGLE_ASSIGNMENTS;
+                displayAssignments(allAssignmentsData);
+                updateStats(allAssignmentsData);
+                loadingMsg.style.display = 'none';
+                return;
             }
 
-            // REAL API MODE - OPTIMIZED
             try {
+                const userinfo = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+                headers: { Authorization: `Bearer ${googleAccessToken}` }
+                });
+                const pfp = await userinfo.json();
+                const avatarDiv = document.querySelector('.user-avatar');
+
+                avatarDiv.style.backgroundImage = `url(${pfp.picture})`;
+
+                avatarDiv.style.backgroundSize = "cover";  // Ensures the image covers the entire div
+                avatarDiv.style.backgroundPosition = "center"; // Centers the image within the div
+                
+                const nameDiv = document.querySelector('.user-name')
+                nameDiv.textContent = pfp.name
+
                 const coursesResponse = await fetch(
                     'https://classroom.googleapis.com/v1/courses?courseStates=ACTIVE',
                     { headers: { 'Authorization': `Bearer ${googleAccessToken}` }}
                 );
 
-                if (!coursesResponse.ok) throw new Error('Failed to fetch Google courses');
+                if (!coursesResponse.ok) throw new Error('Failed to fetch courses');
 
                 const coursesData = await coursesResponse.json();
                 const courses = coursesData.courses || [];
                 
-                // Process all courses in parallel
+                // Store all courses for the Courses page
+                allCoursesData = courses;
+                
                 const coursePromises = courses.map(async (course) => {
                     try {
                         const courseworkResponse = await fetch(
@@ -563,7 +939,6 @@
                         const courseworkData = await courseworkResponse.json();
                         const coursework = courseworkData.courseWork || [];
 
-                        // Fetch all submissions for this course in parallel
                         const assignmentPromises = coursework.map(async (work) => {
                             try {
                                 const submissionResponse = await fetch(
@@ -592,7 +967,7 @@
                                     link: work.alternateLink
                                 };
                             } catch (error) {
-                                console.error(`Error loading submission for ${work.title}:`, error);
+                                console.error(`Error loading submission:`, error);
                                 return null;
                             }
                         });
@@ -600,197 +975,16 @@
                         const assignments = await Promise.all(assignmentPromises);
                         return assignments.filter(a => a !== null);
                     } catch (error) {
-                        console.error(`Error loading Google coursework for ${course.name}:`, error);
+                        console.error(`Error loading coursework:`, error);
                         return [];
                     }
                 });
 
-                const allCourseAssignments = await Promise.all(coursePromises);
-                return allCourseAssignments.flat();
-            } catch (error) {
-                console.error('Error loading Google assignments:', error);
-                return [];
-            }
-        }
-
-        // ============================================
-        // MICROSOFT TEAMS INTEGRATION
-        // ============================================
-
-        function initializeMicrosoftAuth() {
-            if (USE_MOCK_DATA) {
-                console.log('📋 Mock mode enabled - Microsoft auth will be simulated');
-                return;
-            }
-
-            const msalConfig = {
-                auth: {
-                    clientId: MICROSOFT_CLIENT_ID,
-                    authority: 'https://login.microsoftonline.com/common',
-                    redirectUri: window.location.origin
-                }
-            };
-
-            msalInstance = new msal.PublicClientApplication(msalConfig);
-        }
-
-        async function loginMicrosoft() {
-            // MOCK DATA MODE - Skip real authentication
-            if (USE_MOCK_DATA) {
-                console.log('📋 Mock mode: Simulating Microsoft login');
-                microsoftAccessToken = 'MOCK_TOKEN';
-                updateConnectedAccounts();
-                showAssignmentsScreen();
-                loadAllAssignments();
-                return;
-            }
-
-            // REAL API MODE
-            try {
-                const loginResponse = await msalInstance.loginPopup({
-                    scopes: MICROSOFT_SCOPES
-                });
-
-                microsoftAccessToken = loginResponse.accessToken;
-                updateConnectedAccounts();
-                showAssignmentsScreen();
-                loadAllAssignments();
-            } catch (error) {
-                showError('Microsoft authentication failed: ' + error.message);
-            }
-        }
-
-        async function loadTeamsAssignments() {
-            if (!microsoftAccessToken) return [];
-
-            // MOCK DATA MODE
-            if (USE_MOCK_DATA) {
-                console.log('📋 Loading mock Microsoft Teams assignments');
-                // Simulate network delay
-                await new Promise(resolve => setTimeout(resolve, 800));
-                
-                // Process mock data to match our app's format
-                const processedAssignments = MOCK_TEAMS_ASSIGNMENTS_RAW.map(assignment => {
-                    const className = MOCK_TEAMS_CLASSES[assignment.classId]?.displayName || 'Unknown Class';
-                    const submission = MOCK_TEAMS_SUBMISSIONS[assignment.id];
-                    
-                    // Determine status
-                    let status = 'pending';
-                    if (submission) {
-                        if (submission.status === 'submitted' || submission.status === 'returned') {
-                            status = 'submitted';
-                        } else {
-                            // Check if late
-                            const dueDate = new Date(assignment.dueDateTime);
-                            const now = new Date();
-                            if (now > dueDate) {
-                                status = 'late';
-                            }
-                        }
-                    }
-                    
-                    return {
-                        source: 'teams',
-                        title: assignment.displayName,
-                        courseName: className,
-                        dueDate: assignment.dueDateTime ? new Date(assignment.dueDateTime) : null,
-                        status: status,
-                        link: assignment.webUrl
-                    };
-                });
-                
-                return processedAssignments;
-            }
-
-            // REAL API MODE
-            try {
-                const classesResponse = await fetch(
-                    'https://graph.microsoft.com/v1.0/education/me/classes',
-                    { headers: { 'Authorization': `Bearer ${microsoftAccessToken}` }}
-                );
-
-                if (!classesResponse.ok) throw new Error('Failed to fetch Teams classes');
-
-                const classesData = await classesResponse.json();
-                const classes = classesData.value || [];
-                let allAssignments = [];
-
-                for (const classItem of classes) {
-                    try {
-                        const assignmentsResponse = await fetch(
-                            `https://graph.microsoft.com/v1.0/education/classes/${classItem.id}/assignments`,
-                            { headers: { 'Authorization': `Bearer ${microsoftAccessToken}` }}
-                        );
-
-                        if (assignmentsResponse.ok) {
-                            const assignmentsData = await assignmentsResponse.json();
-                            const assignments = assignmentsData.value || [];
-
-                            for (const assignment of assignments) {
-                                const submissionsResponse = await fetch(
-                                    `https://graph.microsoft.com/v1.0/education/classes/${classItem.id}/assignments/${assignment.id}/submissions`,
-                                    { headers: { 'Authorization': `Bearer ${microsoftAccessToken}` }}
-                                );
-
-                                let status = 'pending';
-                                if (submissionsResponse.ok) {
-                                    const submissionsData = await submissionsResponse.json();
-                                    const submission = submissionsData.value?.[0];
-                                    if (submission) {
-                                        if (submission.status === 'submitted' || submission.status === 'returned') {
-                                            status = 'submitted';
-                                        } else {
-                                            // Check if late
-                                            const dueDate = new Date(assignment.dueDateTime);
-                                            const now = new Date();
-                                            if (now > dueDate) {
-                                                status = 'late';
-                                            }
-                                        }
-                                    }
-                                }
-
-                                allAssignments.push({
-                                    source: 'teams',
-                                    title: assignment.displayName,
-                                    courseName: classItem.displayName,
-                                    dueDate: assignment.dueDateTime ? new Date(assignment.dueDateTime) : null,
-                                    status: status,
-                                    link: assignment.webUrl
-                                });
-                            }
-                        }
-                    } catch (error) {
-                        console.error(`Error loading Teams assignments for ${classItem.displayName}:`, error);
-                    }
-                }
-
-                return allAssignments;
-            } catch (error) {
-                console.error('Error loading Teams assignments:', error);
-                return [];
-            }
-        }
-
-        // ============================================
-        // COMBINED ASSIGNMENT DISPLAY
-        // ============================================
-
-        async function loadAllAssignments() {
-            const loadingMsg = document.getElementById('loadingMsg');
-            const assignmentsList = document.getElementById('assignmentsList');
-            
-            loadingMsg.style.display = 'block';
-            assignmentsList.innerHTML = '';
-
-            try {
-                const [googleAssignments, teamsAssignments] = await Promise.all([
-                    loadGoogleAssignments(),
-                    loadTeamsAssignments()
-                ]);
-
-                const allAssignments = [...googleAssignments, ...teamsAssignments];
-                displayAssignments(allAssignments);
+                const allAssignments = await Promise.all(coursePromises);
+                const flatAssignments = allAssignments.flat();
+                allAssignmentsData = flatAssignments;
+                displayAssignments(flatAssignments);
+                updateStats(flatAssignments);
             } catch (error) {
                 showError('Failed to load assignments: ' + error.message);
             } finally {
@@ -798,25 +992,58 @@
             }
         }
 
+        function updateModeIndicator() {
+            const indicator = document.getElementById('modeIndicator');
+            if (USE_MOCK_DATA) {
+                indicator.textContent = '🎭 MOCK DATA MODE - No API calls';
+                indicator.style.display = 'block';
+            } else {
+                indicator.style.display = 'none';
+            }
+        }
+
+        // Update Stats
+        function updateStats(assignments) {
+            // Filter out ignored courses
+            const filteredAssignments = assignments.filter(a => !ignoredCourses.has(a.courseName));
+            
+            const pending = filteredAssignments.filter(a => a.status !== 'submitted');
+            const late = filteredAssignments.filter(a => a.status === 'late');
+            const dueToday = pending.filter(a => {
+                const date = parseGoogleDate(a.dueDate);
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                return date && date.getTime() === today.getTime();
+            });
+
+            document.getElementById('totalCount').textContent = pending.length;
+            document.getElementById('pendingCount').textContent = pending.filter(a => a.status === 'pending').length;
+            document.getElementById('lateCount').textContent = late.length;
+            document.getElementById('dueToday').textContent = dueToday.length;
+        }
+
+        // Display Assignments
         function displayAssignments(assignments) {
             const assignmentsList = document.getElementById('assignmentsList');
             
-            const pendingAssignments = assignments.filter(a => a.status !== 'submitted');
+            // Filter out ignored courses
+            const filteredAssignments = assignments.filter(a => !ignoredCourses.has(a.courseName));
+            const pendingAssignments = filteredAssignments.filter(a => a.status !== 'submitted');
             
             if (pendingAssignments.length === 0) {
                 assignmentsList.innerHTML = `
                     <div class="empty-state">
-                        <h3>🎉 All caught up!</h3>
+                        <div class="empty-state-icon">🎉</div>
+                        <h3>All caught up!</h3>
                         <p>You have no pending assignments.</p>
                     </div>
                 `;
                 return;
             }
 
-            // Sort by due date
             pendingAssignments.sort((a, b) => {
-                const dateA = a.source === 'google' ? parseGoogleDate(a.dueDate) : a.dueDate;
-                const dateB = b.source === 'google' ? parseGoogleDate(b.dueDate) : b.dueDate;
+                const dateA = parseGoogleDate(a.dueDate);
+                const dateB = parseGoogleDate(b.dueDate);
                 if (!dateA) return 1;
                 if (!dateB) return -1;
                 return dateA - dateB;
@@ -824,19 +1051,23 @@
 
             assignmentsList.innerHTML = pendingAssignments.map(assignment => {
                 const dueDate = formatDueDate(assignment);
-                const statusClass = `status-${assignment.status}`;
+                const statusClass = assignment.status;
                 const statusText = assignment.status === 'late' ? 'Late' : 'Pending';
-                const sourceClass = assignment.source === 'google' ? 'source-google' : 'source-teams';
-                const sourceText = assignment.source === 'google' ? 'Google Classroom' : 'Microsoft Teams';
-                const cardClass = assignment.source === 'teams' ? 'assignment-card teams' : 'assignment-card';
+                const statusIcon = assignment.status === 'late' ? '⚠️' : '⏳';
 
                 return `
-                    <div class="${cardClass}">
-                        <span class="assignment-source ${sourceClass}">${sourceText}</span>
-                        <div class="assignment-course">${assignment.courseName}</div>
+                    <div class="assignment-card" onclick="window.open('${assignment.link}', '_blank')">
+                        <div class="assignment-header">
+                            <span class="assignment-badge">Google Classroom</span>
+                        </div>
                         <div class="assignment-title">${assignment.title}</div>
-                        <div class="assignment-due">📅 Due: ${dueDate}</div>
-                        <span class="assignment-status ${statusClass}">${statusText}</span>
+                        <div class="assignment-course">${assignment.courseName}</div>
+                        <div class="assignment-meta">
+                            <span>📅 ${dueDate}</span>
+                        </div>
+                        <div class="assignment-status ${statusClass}">
+                            ${statusIcon} ${statusText}
+                        </div>
                     </div>
                 `;
             }).join('');
@@ -848,58 +1079,359 @@
         }
 
         function formatDueDate(assignment) {
-            let date;
+            if (!assignment.dueDate) return 'No due date';
             
-            if (assignment.source === 'google') {
-                if (!assignment.dueDate) return 'No due date';
-                date = parseGoogleDate(assignment.dueDate);
-            } else {
-                if (!assignment.dueDate) return 'No due date';
-                date = assignment.dueDate;
-            }
-            
+            const date = parseGoogleDate(assignment.dueDate);
             const today = new Date();
             today.setHours(0, 0, 0, 0);
             
             const diffTime = date - today;
             const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
             
-            if (diffDays === 0) return 'Today';
-            if (diffDays === 1) return 'Tomorrow';
-            if (diffDays < 0) return `${Math.abs(diffDays)} days ago`;
-            if (diffDays < 7) return `In ${diffDays} days`;
+            if (diffDays === 0) return 'Due Today';
+            if (diffDays === 1) return 'Due Tomorrow';
+            if (diffDays < 0) return `${Math.abs(diffDays)} days overdue`;
+            if (diffDays < 7) return `Due in ${diffDays} days`;
             
-            return date.toLocaleDateString();
+            return `Due ${date.toLocaleDateString()}`;
         }
 
-        // ============================================
-        // UI HELPERS
-        // ============================================
+        // UI Functions
+        function showPage(page) {
+            // Update sidebar active state
+            document.querySelectorAll('.sidebar-menu-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            event.target.closest('.sidebar-menu-item').classList.add('active');
 
-        function updateConnectedAccounts() {
-            const container = document.getElementById('connectedAccounts');
-            let badges = [];
+            // Hide all pages
+            document.getElementById('assignmentsPage').style.display = 'none';
+            document.getElementById('statisticsPage').style.display = 'none';
+            document.getElementById('coursesPage').style.display = 'none';
+            document.getElementById('settingsPage').style.display = 'none';
 
-            if (googleAccessToken) {
-                badges.push('<div class="account-badge">✓ Google Classroom</div>');
+            // Show selected page
+            if (page === 'assignments') {
+                document.getElementById('assignmentsPage').style.display = 'block';
+            } else if (page === 'statistics') {
+                document.getElementById('statisticsPage').style.display = 'block';
+                generateStatistics();
+            } else if (page === 'courses') {
+                document.getElementById('coursesPage').style.display = 'block';
+                displayCourses();
+            } else if (page === 'settings') {
+                document.getElementById('settingsPage').style.display = 'block';
+                initializeSettings();
             }
-            if (microsoftAccessToken) {
-                badges.push('<div class="account-badge microsoft">✓ Microsoft Teams</div>');
-            }
-
-            container.innerHTML = badges.join('');
         }
 
-        function showAssignmentsScreen() {
-            document.getElementById('loginScreen').style.display = 'none';
-            document.getElementById('assignmentsScreen').classList.add('active');
+        function displayCourses() {
+            const coursesList = document.getElementById('coursesList');
+            
+            if (allCoursesData.length === 0) {
+                coursesList.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📚</div>
+                        <h3>No courses found</h3>
+                        <p>Loading courses...</p>
+                    </div>
+                `;
+                return;
+            }
+
+            // Count assignments per course
+            const assignmentCounts = {};
+            allAssignmentsData.forEach(a => {
+                if (a.status !== 'submitted') {
+                    assignmentCounts[a.courseName] = (assignmentCounts[a.courseName] || 0) + 1;
+                }
+            });
+
+            coursesList.innerHTML = allCoursesData.map(course => {
+                const isIgnored = ignoredCourses.has(course.name);
+                const assignmentCount = assignmentCounts[course.name] || 0;
+                
+                return `
+                    <div style="display: flex; align-items: center; justify-content: space-between; padding: 1rem; background: rgba(182, 109, 255, 0.05); border-radius: 8px; margin-bottom: 0.75rem; border-left: 3px solid ${isIgnored ? 'var(--text-muted)' : 'var(--primary)'};">
+                        <div style="display: flex; align-items: center; gap: 1rem; flex: 1;">
+                            <label style="display: flex; align-items: center; cursor: pointer;">
+                                <input type="checkbox" ${isIgnored ? '' : 'checked'} onchange="toggleCourse('${course.name.replace(/'/g, "\\'")}', this.checked)" style="width: 20px; height: 20px; cursor: pointer;">
+                            </label>
+                            <div style="flex: 1; ${isIgnored ? 'opacity: 0.5;' : ''}">
+                                <div style="font-weight: 600; margin-bottom: 0.25rem;">${course.name}</div>
+                                <div style="font-size: 0.875rem; color: var(--text-secondary);">
+                                    ${assignmentCount} pending assignment${assignmentCount !== 1 ? 's' : ''}
+                                </div>
+                            </div>
+                        </div>
+                        ${isIgnored ? '<span style="color: var(--text-muted); font-size: 0.875rem; font-weight: 600;">IGNORED</span>' : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function toggleCourse(courseName, isEnabled) {
+            if (isEnabled) {
+                ignoredCourses.delete(courseName);
+            } else {
+                ignoredCourses.add(courseName);
+            }
+            
+            // Save to localStorage
+            localStorage.setItem('ignoredCourses', JSON.stringify([...ignoredCourses]));
+            
+            // Refresh displays
+            displayAssignments(allAssignmentsData);
+            updateStats(allAssignmentsData);
+            displayCourses();
+        }
+
+        function initializeSettings() {
+            // Set the current theme radio button
+            document.querySelectorAll('input[name="theme"]').forEach(radio => {
+                if (radio.value === currentTheme) {
+                    radio.checked = true;
+                    radio.closest('.theme-option').style.borderColor = 'var(--primary)';
+                }
+            });
+
+            // Add event listeners
+            document.querySelectorAll('input[name="theme"]').forEach(radio => {
+                radio.addEventListener('change', (e) => {
+                    changeTheme(e.target.value);
+                });
+            });
+        }
+
+        function changeTheme(theme) {
+            currentTheme = theme;
+            localStorage.setItem('theme', theme);
+            
+            // Remove all theme classes
+            document.body.classList.remove('light-theme', 'midnight-theme');
+            
+            // Add new theme class
+            if (theme === 'light') {
+                document.body.classList.add('light-theme');
+            } else if (theme === 'midnight') {
+                document.body.classList.add('midnight-theme');
+            }
+            
+            // Update radio button borders
+            document.querySelectorAll('.theme-option').forEach(option => {
+                option.style.borderColor = 'transparent';
+            });
+            document.querySelector(`.theme-option[data-theme="${theme}"]`).style.borderColor = 'var(--primary)';
+        }
+
+        function applyTheme() {
+            if (currentTheme === 'light') {
+                document.body.classList.add('light-theme');
+            } else if (currentTheme === 'midnight') {
+                document.body.classList.add('midnight-theme');
+            }
+        }
+
+        function generateStatistics() {
+            // Filter out ignored courses
+            const assignments = allAssignmentsData.filter(a => !ignoredCourses.has(a.courseName));
+            
+            // Due this week
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const weekFromNow = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
+            
+            const thisWeek = assignments.filter(a => {
+                const date = parseGoogleDate(a.dueDate);
+                if (!date) return false;
+                return date >= today && date <= weekFromNow && a.status !== 'submitted';
+            });
+            document.getElementById('upcomingWeek').textContent = thisWeek.length;
+
+            // Total overdue
+            const overdue = assignments.filter(a => a.status === 'late');
+            document.getElementById('overdueTotal').textContent = overdue.length;
+
+            // Active courses count (only courses with pending assignments)
+            const pendingAssignments = assignments.filter(a => a.status !== 'submitted');
+            const uniqueCourses = [...new Set(pendingAssignments.map(a => a.courseName))];
+            document.getElementById('totalCourses').textContent = uniqueCourses.length;
+
+            // Average assignments per course
+            const avgPerCourse = uniqueCourses.length > 0 
+                ? (pendingAssignments.length / uniqueCourses.length).toFixed(1)
+                : 0;
+            document.getElementById('avgPerCourse').textContent = avgPerCourse;
+
+            // Generate charts
+            generateStatusChart(assignments);
+            generateCourseChart(assignments);
+            generateUpcomingDeadlines(thisWeek);
+        }
+
+        function generateStatusChart(assignments) {
+            const ctx = document.getElementById('statusChart').getContext('2d');
+            
+            if (statusChartInstance) {
+                statusChartInstance.destroy();
+            }
+
+            const pending = assignments.filter(a => a.status === 'pending').length;
+            const late = assignments.filter(a => a.status === 'late').length;
+
+            // Only show chart if there's data
+            if (pending === 0 && late === 0) {
+                ctx.canvas.parentElement.innerHTML = `
+                    <div class="card-title">Assignment Status Distribution</div>
+                    <div class="empty-state">
+                        <div class="empty-state-icon">🎉</div>
+                        <h3>No pending assignments!</h3>
+                        <p>You're all caught up.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            statusChartInstance = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Pending', 'Late'],
+                    datasets: [{
+                        data: [pending, late],
+                        backgroundColor: ['#ffab00', '#fc424a'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: { color: '#ffffff', padding: 15 }
+                        }
+                    }
+                }
+            });
+        }
+
+        function generateCourseChart(assignments) {
+            const ctx = document.getElementById('courseChart').getContext('2d');
+            
+            if (courseChartInstance) {
+                courseChartInstance.destroy();
+            }
+
+            // Only count pending assignments
+            const pendingAssignments = assignments.filter(a => a.status !== 'submitted');
+
+            // Count assignments by course
+            const courseCounts = {};
+            pendingAssignments.forEach(a => {
+                courseCounts[a.courseName] = (courseCounts[a.courseName] || 0) + 1;
+            });
+
+            const courses = Object.keys(courseCounts);
+            const counts = Object.values(courseCounts);
+
+            // Only show chart if there's data
+            if (courses.length === 0) {
+                ctx.canvas.parentElement.innerHTML = `
+                    <div class="card-title">Assignments by Course</div>
+                    <div class="empty-state">
+                        <div class="empty-state-icon">🎉</div>
+                        <h3>No pending assignments!</h3>
+                        <p>You're all caught up.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            courseChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: courses,
+                    datasets: [{
+                        label: 'Assignments',
+                        data: counts,
+                        backgroundColor: '#b66dff',
+                        borderRadius: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: { 
+                                color: '#adb5bd',
+                                stepSize: 1
+                            },
+                            grid: { color: 'rgba(255, 255, 255, 0.1)' }
+                        },
+                        x: {
+                            ticks: { color: '#adb5bd' },
+                            grid: { display: false }
+                        }
+                    }
+                }
+            });
+        }
+
+        function generateUpcomingDeadlines(upcomingAssignments) {
+            const container = document.getElementById('upcomingDeadlines');
+            
+            if (upcomingAssignments.length === 0) {
+                container.innerHTML = `
+                    <div style="text-align: center; padding: 2rem; color: var(--text-secondary);">
+                        <div style="font-size: 3rem; margin-bottom: 0.5rem;">🎉</div>
+                        <div>No assignments due in the next 7 days!</div>
+                    </div>
+                `;
+                return;
+            }
+
+            // Sort by due date
+            upcomingAssignments.sort((a, b) => {
+                const dateA = parseGoogleDate(a.dueDate);
+                const dateB = parseGoogleDate(b.dueDate);
+                return dateA - dateB;
+            });
+
+            container.innerHTML = upcomingAssignments.map(assignment => {
+                const dueDate = formatDueDate(assignment);
+                const statusColor = assignment.status === 'late' ? 'var(--danger)' : 'var(--warning)';
+                
+                return `
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 1rem; background: rgba(182, 109, 255, 0.05); border-radius: 8px; border-left: 3px solid ${statusColor}; margin-bottom: 0.75rem; cursor: pointer;" onclick="window.open('${assignment.link}', '_blank')">
+                        <div style="flex: 1;">
+                            <div style="font-weight: 600; margin-bottom: 0.25rem;">${assignment.title}</div>
+                            <div style="font-size: 0.875rem; color: var(--text-secondary);">${assignment.courseName}</div>
+                        </div>
+                        <div style="text-align: right;">
+                            <div style="font-weight: 600; color: ${statusColor};">${dueDate}</div>
+                            <div style="font-size: 0.75rem; color: var(--text-muted);">${assignment.status === 'late' ? 'Overdue' : 'Upcoming'}</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function showDashboard() {
+            document.getElementById('loginPage').style.display = 'none';
+            document.getElementById('dashboardPage').style.display = 'block';
         }
 
         function showLoginScreen() {
-            document.getElementById('loginScreen').style.display = 'block';
-            document.getElementById('assignmentsScreen').classList.remove('active');
+            document.getElementById('loginPage').style.display = 'flex';
+            document.getElementById('dashboardPage').style.display = 'none';
             googleAccessToken = null;
-            microsoftAccessToken = null;
         }
 
         function showError(message) {
@@ -908,22 +1440,16 @@
             errorMsg.style.display = 'block';
         }
 
-        // ============================================
-        // EVENT LISTENERS
-        // ============================================
-
+        // Event Listeners
         document.getElementById('googleLoginBtn').addEventListener('click', () => {
-            // In mock mode, directly handle "login"
-            if (USE_MOCK_DATA_GOOGLE) {
+            if (USE_MOCK_DATA) {
                 console.log('📋 Mock mode: Simulating Google login');
                 googleAccessToken = 'MOCK_TOKEN';
-                updateConnectedAccounts();
-                showAssignmentsScreen();
-                loadAllAssignments();
+                showDashboard();
+                loadAssignments();
                 return;
             }
 
-            // Real mode
             if (!GOOGLE_CLIENT_ID.includes('YOUR_')) {
                 googleTokenClient.requestAccessToken();
             } else {
@@ -931,30 +1457,17 @@
             }
         });
 
-        document.getElementById('microsoftLoginBtn').addEventListener('click', () => {
-            loginMicrosoft();
-        });
-
         document.getElementById('logoutBtn').addEventListener('click', () => {
             showLoginScreen();
         });
 
-        // ============================================
-        // INITIALIZE ON PAGE LOAD
-        // ============================================
-
+        // Initialize
         window.addEventListener('DOMContentLoaded', () => {
-            updateModeIndicator();
             initializeGoogleAuth();
-            initializeMicrosoftAuth();
-            
+            updateModeIndicator();
+
             if (USE_MOCK_DATA) {
-                console.log('%c📋 MOCK DATA MODE ENABLED', 'background: #ffc107; color: #000; font-size: 16px; padding: 8px;');
-                console.log('No API calls will be made. All data is simulated.');
-                console.log('To use real APIs, set USE_MOCK_DATA = false in the code.');
-            } else {
-                console.log('%c🔒 LIVE MODE ENABLED', 'background: #4caf50; color: #fff; font-size: 16px; padding: 8px;');
-                console.log('Real API calls will be made. Admin approval required.');
+                console.log('%c📋 MOCK DATA MODE ENABLED', 'background: #ffab00; color: #000; font-size: 16px; padding: 8px;');
             }
         });
     </script>
