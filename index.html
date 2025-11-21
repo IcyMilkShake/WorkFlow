@@ -528,7 +528,7 @@
         <div class="auth-card">
             <div class="sidebar-brand-icon">📊</div>
             <h2>WorkFlow</h2>
-            <p>Track all your Google Classroom assignments in one beautiful dashboard</p>
+            <p>Track all your Google Classroom assignments in one simple and easy dashboard</p>
             
             <button class="btn btn-google" id="googleLoginBtn">
                 <svg width="20" height="20" viewBox="0 0 20 20">
@@ -569,6 +569,10 @@
                 <a class="sidebar-menu-item" onclick="showPage('settings')">
                     <span class="sidebar-menu-icon">⚙️</span>
                     <span>Settings</span>
+                </a>
+                <a class="sidebar-menu-item" onclick="showPage('help')">
+                    <span class="sidebar-menu-icon">❓</span>
+                    <span>Help</span>
                 </a>
             </div>
         </nav>
@@ -775,6 +779,114 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Help Page -->
+                <div id="helpPage" style="display: none;">
+                    <!-- Page Header -->
+                    <div class="page-header">
+                        <h3>Help & Troubleshooting</h3>
+                        <div class="breadcrumb">
+                            <span>Home</span>
+                            <span>/</span>
+                            <span>Help</span>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-title">❓ Frequently Asked Questions</div>
+                        
+                        <div style="margin-top: 1.5rem;">
+                            <!-- Question 1 -->
+                            <details style="margin-bottom: 1rem; padding: 1rem; background: rgba(182, 109, 255, 0.05); border-radius: 8px; border-left: 3px solid var(--primary);">
+                                <summary style="font-weight: 600; cursor: pointer; user-select: none; padding: 0.5rem 0;">
+                                    🚫 Why am I getting "Permission Denied" (403) errors with my school account?
+                                </summary>
+                                <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color); color: var(--text-secondary); line-height: 1.8;">
+                                    <p style="margin-bottom: 1rem;">This is a common issue with school Google Workspace accounts. Here are the main reasons:</p>
+                                    
+                                    <div style="margin-bottom: 1rem;">
+                                        <strong style="color: var(--text-primary);">1. Google Workspace Admin Restrictions (Most Common)</strong><br>
+                                        School IT administrators can block third-party apps from accessing Google Classroom through admin settings. They may have disabled API access entirely or only allow apps on an approved whitelist.
+                                    </div>
+
+                                    <div style="margin-bottom: 1rem;">
+                                        <strong style="color: var(--text-primary);">2. Student Account Limitations</strong><br>
+                                        Student accounts often have more restrictions than teacher accounts. Some schools limit what APIs students can access for security reasons.
+                                    </div>
+
+                                    <div style="margin-bottom: 1rem;">
+                                        <strong style="color: var(--text-primary);">3. Organizational Unit (OU) Policies</strong><br>
+                                        Your account might be in an organizational unit with restricted permissions, even if other students at the same school have access.
+                                    </div>
+
+                                    <p style="margin-top: 1.5rem;"><strong style="color: var(--primary);">What you can do:</strong></p>
+                                    <ul style="margin-left: 1.5rem; margin-top: 0.5rem;">
+                                        <li style="margin-bottom: 0.5rem;">Contact your school IT department and ask if they can enable Google Classroom API access for third-party apps</li>
+                                        <li style="margin-bottom: 0.5rem;">Ask them to whitelist this app using the OAuth Client ID</li>
+                                        <li style="margin-bottom: 0.5rem;">Use a personal Gmail account instead (if you have assignments there)</li>
+                                        <li>Check if other students at your school have the same issue</li>
+                                    </ul>
+
+                                    <div style="margin-top: 1rem; padding: 0.75rem; background: rgba(255, 171, 0, 0.1); border-radius: 6px; border-left: 3px solid var(--warning);">
+                                        <strong style="color: var(--warning);">Note:</strong> This app works fine with personal Gmail accounts. The issue is specifically related to school Google Workspace restrictions.
+                                    </div>
+                                </div>
+                            </details>
+
+                            <!-- Question 2 -->
+                            <details style="margin-bottom: 1rem; padding: 1rem; background: rgba(182, 109, 255, 0.05); border-radius: 8px; border-left: 3px solid var(--primary);">
+                                <summary style="font-weight: 600; cursor: pointer; user-select: none; padding: 0.5rem 0;">
+                                    🔄 Why aren't my assignments loading?
+                                </summary>
+                                <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color); color: var(--text-secondary); line-height: 1.8;">
+                                    <p style="margin-bottom: 1rem;">If you're signed in but assignments aren't showing:</p>
+                                    <ul style="margin-left: 1.5rem;">
+                                        <li style="margin-bottom: 0.5rem;">Make sure you have active courses with assignments in Google Classroom</li>
+                                        <li style="margin-bottom: 0.5rem;">Check if any courses are marked as "ignored" in the Courses page</li>
+                                        <li style="margin-bottom: 0.5rem;">Try logging out and logging back in to refresh permissions</li>
+                                        <li>Check your internet connection</li>
+                                    </ul>
+                                </div>
+                            </details>
+
+                            <!-- Question 3 -->
+                            <details style="margin-bottom: 1rem; padding: 1rem; background: rgba(182, 109, 255, 0.05); border-radius: 8px; border-left: 3px solid var(--primary);">
+                                <summary style="font-weight: 600; cursor: pointer; user-select: none; padding: 0.5rem 0;">
+                                    🔒 Is my data safe?
+                                </summary>
+                                <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color); color: var(--text-secondary); line-height: 1.8;">
+                                    <p style="margin-bottom: 1rem;">Yes this app:</p>
+                                    <ul style="margin-left: 1.5rem;">
+                                        <li style="margin-bottom: 0.5rem;">Only reads your assignment data and nothing else</li>
+                                        <li style="margin-bottom: 0.5rem;">Doesn't store your data on any server</li>
+                                        <li style="margin-bottom: 0.5rem;">Runs entirely in your browser</li>
+                                        <li>Uses Google's official OAuth 2.0 authentication</li>
+                                    </ul>
+                                </div>
+                            </details>
+
+                            <!-- Question 4 -->
+                            <details style="margin-bottom: 1rem; padding: 1rem; background: rgba(182, 109, 255, 0.05); border-radius: 8px; border-left: 3px solid var(--primary);">
+                                <summary style="font-weight: 600; cursor: pointer; user-select: none; padding: 0.5rem 0;">
+                                    🎯 Can I use this with multiple Google accounts?
+                                </summary>
+                                <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color); color: var(--text-secondary); line-height: 1.8;">
+                                    <p>Currently, you can only be signed in with one Google account at a time. To switch accounts, log out and sign in with a different account.</p>
+                                </div>
+                            </details>
+
+                            <!-- Question 5 -->
+                            <details style="padding: 1rem; background: rgba(182, 109, 255, 0.05); border-radius: 8px; border-left: 3px solid var(--primary);">
+                                <summary style="font-weight: 600; cursor: pointer; user-select: none; padding: 0.5rem 0;">
+                                    📱 Does this work on mobile?
+                                </summary>
+                                <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color); color: var(--text-secondary); line-height: 1.8;">
+                                    <p>Yes, WorkFlow is fully responsive and works on phones, tablets, and desktops. However, for the best experience use desktop or tablet devices.</p>
+                                </div>
+                            </details>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -788,7 +900,7 @@
         // Configuration
         const USE_MOCK_DATA = false;
         const GOOGLE_CLIENT_ID = '204169741443-lrnat59d7ob8ae63srsbg2ojefn1f51h.apps.googleusercontent.com';
-        const GOOGLE_SCOPES = 'https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/classroom.courses.readonly https://www.googleapis.com/auth/classroom.coursework.students.readonly https://www.googleapis.com/auth/classroom.student-submissions.students.readonly';
+        const GOOGLE_SCOPES = 'https://www.googleapis.com/auth/classroom.courses.readonly https://www.googleapis.com/auth/classroom.coursework.students.readonly https://www.googleapis.com/auth/classroom.student-submissions.students.readonly';
 
         let googleTokenClient;
         let googleAccessToken = null;
@@ -910,7 +1022,7 @@
 
                 avatarDiv.style.backgroundSize = "cover";  // Ensures the image covers the entire div
                 avatarDiv.style.backgroundPosition = "center"; // Centers the image within the div
-                
+
                 const nameDiv = document.querySelector('.user-name')
                 nameDiv.textContent = pfp.name
 
@@ -923,7 +1035,6 @@
 
                 const coursesData = await coursesResponse.json();
                 const courses = coursesData.courses || [];
-                
                 // Store all courses for the Courses page
                 allCoursesData = courses;
                 
@@ -938,7 +1049,7 @@
 
                         const courseworkData = await courseworkResponse.json();
                         const coursework = courseworkData.courseWork || [];
-
+                        console.log(coursework)
                         const assignmentPromises = coursework.map(async (work) => {
                             try {
                                 const submissionResponse = await fetch(
@@ -1109,6 +1220,7 @@
             document.getElementById('statisticsPage').style.display = 'none';
             document.getElementById('coursesPage').style.display = 'none';
             document.getElementById('settingsPage').style.display = 'none';
+            document.getElementById('helpPage').style.display = 'none';
 
             // Show selected page
             if (page === 'assignments') {
@@ -1122,6 +1234,8 @@
             } else if (page === 'settings') {
                 document.getElementById('settingsPage').style.display = 'block';
                 initializeSettings();
+            } else if (page === 'help') {
+                document.getElementById('helpPage').style.display = 'block';
             }
         }
 
