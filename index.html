@@ -903,7 +903,8 @@
         const GOOGLE_SCOPES = 'https://www.googleapis.com/auth/classroom.courses.readonly https://www.googleapis.com/auth/classroom.coursework.students.readonly https://www.googleapis.com/auth/classroom.student-submissions.students.readonly';
 
         let googleTokenClient;
-        let googleAccessToken = null;
+        let googleAccessToken = localStorage.getItem('googleAccessToken') || null;
+        let tokenExpiry = localStorage.getItem('tokenExpiry') || null;
         let allAssignmentsData = [];
         let statusChartInstance = null;
         let courseChartInstance = null;
@@ -990,6 +991,9 @@
             }
             
             googleAccessToken = response.access_token;
+            const expiryTime = Date.now() + (response.expires_in || 3600) * 1000;
+            localStorage.setItem('googleAccessToken', googleAccessToken);
+            localStorage.setItem('tokenExpiry', expiryTime.toString());
             showDashboard();
             loadAssignments();
         }
@@ -1546,6 +1550,8 @@
             document.getElementById('loginPage').style.display = 'flex';
             document.getElementById('dashboardPage').style.display = 'none';
             googleAccessToken = null;
+            localStorage.removeItem('googleAccessToken');
+            localStorage.removeItem('tokenExpiry');
         }
 
         function showError(message) {
@@ -1582,6 +1588,20 @@
 
             if (USE_MOCK_DATA) {
                 console.log('%c📋 MOCK DATA MODE ENABLED', 'background: #ffab00; color: #000; font-size: 16px; padding: 8px;');
+            }
+            // Check for existing valid session
+            if (!USE_MOCK_DATA && googleAccessToken && tokenExpiry) {
+                const now = Date.now();
+                const expiry = parseInt(tokenExpiry);
+                
+                if (now < expiry) {
+                    console.log('✅ Restoring previous session');
+                    showDashboard();
+                    loadAssignments();
+                } else {
+                    console.log('⏰ Session expired, please log in again');
+                    showLoginScreen();
+                }
             }
         });
     </script>
