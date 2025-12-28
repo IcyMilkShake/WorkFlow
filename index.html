@@ -675,10 +675,6 @@
                     <span class="sidebar-menu-icon">📊</span>
                     <span>Statistics</span>
                 </a>
-                <a class="sidebar-menu-item" onclick="showPage('productivity')">
-                    <span class="sidebar-menu-icon">🔥</span>
-                    <span>Productivity</span>
-                </a>
                 <a class="sidebar-menu-item" onclick="showPage('ai-assistant')">
                     <span class="sidebar-menu-icon">🤖</span>
                     <span>AI Assistant</span>
@@ -832,11 +828,8 @@
                         <div class="card-title">📅 Upcoming Deadlines (Next 7 Days)</div>
                         <div id="upcomingDeadlines" style="margin-top: 1rem;"></div>
                     </div>
-                </div>
 
-                <!-- Productivity Page -->
-                <div id="productivityPage" style="display: none;">
-                    <div class="page-header">
+                    <div class="page-header" style="margin-top: 3rem;">
                         <h3>📈 Your Productivity</h3>
                         <p style="color: var(--text-secondary);">Track your assignment completion over time</p>
                     </div>
@@ -1378,6 +1371,10 @@ function generateStatistics() {
   generateStatusChart(assignments);
   generateCourseChart(assignments);
   generateUpcomingDeadlines(thisWeek);
+
+  // Also update productivity stats since we merged the pages
+  updateProductivityStats();
+  generateProductivityChart(currentProductivityView);
 }
 
 function generateStatusChart(assignments) {
@@ -1758,61 +1755,66 @@ async function loadAssignments() {
     const courses = coursesData.courses || [];
     allCoursesData = courses;
     
-    const coursePromises = courses.map(async (course) => {
+    const flatAssignments = [];
+
+    // Process courses sequentially to avoid 429 Too Many Requests
+    for (const course of courses) {
       try {
         const courseworkResponse = await fetch(
           `https://classroom.googleapis.com/v1/courses/${course.id}/courseWork`,
           { headers: { 'Authorization': `Bearer ${googleAccessToken}` }}
         );
 
-        if (!courseworkResponse.ok) return [];
+        if (!courseworkResponse.ok) continue;
 
         const courseworkData = await courseworkResponse.json();
         const coursework = courseworkData.courseWork || [];
         
-        const assignmentPromises = coursework.map(async (work) => {
-          try {
-            const submissionResponse = await fetch(
-              `https://classroom.googleapis.com/v1/courses/${course.id}/courseWork/${work.id}/studentSubmissions`,
-              { headers: { 'Authorization': `Bearer ${googleAccessToken}` }}
-            );
+        // Process assignments in batches of 5 to respect rate limits
+        const BATCH_SIZE = 5;
+        for (let i = 0; i < coursework.length; i += BATCH_SIZE) {
+          const batch = coursework.slice(i, i + BATCH_SIZE);
+          const assignmentPromises = batch.map(async (work) => {
+            try {
+              const submissionResponse = await fetch(
+                `https://classroom.googleapis.com/v1/courses/${course.id}/courseWork/${work.id}/studentSubmissions`,
+                { headers: { 'Authorization': `Bearer ${googleAccessToken}` }}
+              );
 
-            let status = 'pending';
-            if (submissionResponse.ok) {
-              const submissionData = await submissionResponse.json();
-              const submission = submissionData.studentSubmissions?.[0];
-              if (submission) {
-                status = submission.state === 'TURNED_IN' || submission.state === 'RETURNED' 
-                  ? 'submitted' 
-                  : submission.late ? 'late' : 'pending';
+              let status = 'pending';
+              if (submissionResponse.ok) {
+                const submissionData = await submissionResponse.json();
+                const submission = submissionData.studentSubmissions?.[0];
+                if (submission) {
+                  status = submission.state === 'TURNED_IN' || submission.state === 'RETURNED'
+                    ? 'submitted'
+                    : submission.late ? 'late' : 'pending';
+                }
               }
+
+              return {
+                source: 'google',
+                title: work.title,
+                courseName: course.name,
+                dueDate: work.dueDate,
+                dueTime: work.dueTime,
+                status: status,
+                link: work.alternateLink
+              };
+            } catch (error) {
+              console.error(`Error loading submission:`, error);
+              return null;
             }
+          });
 
-            return {
-              source: 'google',
-              title: work.title,
-              courseName: course.name,
-              dueDate: work.dueDate,
-              dueTime: work.dueTime,
-              status: status,
-              link: work.alternateLink
-            };
-          } catch (error) {
-            console.error(`Error loading submission:`, error);
-            return null;
-          }
-        });
-
-        const assignments = await Promise.all(assignmentPromises);
-        return assignments.filter(a => a !== null);
+          const batchResults = await Promise.all(assignmentPromises);
+          flatAssignments.push(...batchResults.filter(a => a !== null));
+        }
       } catch (error) {
-        console.error(`Error loading coursework:`, error);
-        return [];
+        console.error(`Error loading coursework for ${course.name}:`, error);
       }
-    });
+    }
 
-    const allAssignments = await Promise.all(coursePromises);
-    const flatAssignments = allAssignments.flat();
     allAssignmentsData = flatAssignments;
     
     checkForCompletions(flatAssignments);
@@ -1921,14 +1923,13 @@ function showPage(page) {
   event.target.closest('.sidebar-menu-item').classList.add('active');
 
   document.getElementById('assignmentsPage').style.display = 'none';
-  document.getElementById('productivityPage').style.display = 'none';
   document.getElementById('aiAssistantPage').style.display = 'none';
   document.getElementById('coursesPage').style.display = 'none';
   document.getElementById('settingsPage').style.display = 'none';
 
-  if (page === 'productivity') {
-    document.getElementById('productivityPage').style.display = 'block';
-    updateProductivityStats();
+  if (page === 'statistics') {
+    document.getElementById('statisticsPage').style.display = 'block';
+    generateStatistics();
   } else if (page === 'ai-assistant') {
     document.getElementById('aiAssistantPage').style.display = 'block';
     initAIAssistant();
