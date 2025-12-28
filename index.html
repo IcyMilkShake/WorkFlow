@@ -1650,7 +1650,12 @@ Be encouraging, friendly, and practical. Keep answers concise (2-3 paragraphs ma
       })
     });
     
-    if (!response.ok) throw new Error('OpenAI API request failed');
+    if (!response.ok) {
+      if (response.status === 429) {
+        throw new Error('quota_exceeded');
+      }
+      throw new Error('OpenAI API request failed');
+    }
     
     const data = await response.json();
     const aiMessage = data.choices[0].message.content;
@@ -1660,7 +1665,11 @@ Be encouraging, friendly, and practical. Keep answers concise (2-3 paragraphs ma
     
   } catch (error) {
     typingDiv.remove();
-    addChatMessage('Sorry, I encountered an error. Please check your API key and try again.', 'assistant');
+    if (error.message === 'quota_exceeded') {
+      addChatMessage('⚠️ It seems you have exceeded your OpenAI API quota or rate limit. If you just created your key, you may need to set up billing at platform.openai.com/account/billing.', 'assistant');
+    } else {
+      addChatMessage('Sorry, I encountered an error. Please check your API key and try again.', 'assistant');
+    }
     console.error('AI Error:', error);
   }
 }
