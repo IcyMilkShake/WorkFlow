@@ -556,6 +556,7 @@
             padding: 1rem;
             border-radius: 12px;
             line-height: 1.6;
+            white-space: pre-wrap;
         }
 
         .chat-message.user .chat-content {
@@ -1666,6 +1667,9 @@ async function generateProactiveGreeting() {
     const data = await response.json();
     const greeting = data.choices[0].message.content;
 
+    // Add greeting to history so the AI remembers it
+    conversationHistory.push({ role: 'assistant', content: greeting });
+
     typingDiv.remove();
     addChatMessage(greeting, 'assistant');
 
@@ -1673,7 +1677,9 @@ async function generateProactiveGreeting() {
     typingDiv.remove();
     console.error('Greeting Error:', error);
     // Fallback if API fails
-    addChatMessage(`Hi! I can see you have ${document.getElementById('aiPendingCount').textContent} pending assignments. How can I help?`, 'assistant');
+    const fallbackMsg = `Hi! I can see you have ${document.getElementById('aiPendingCount').textContent} pending assignments. How can I help?`;
+    conversationHistory.push({ role: 'assistant', content: fallbackMsg });
+    addChatMessage(fallbackMsg, 'assistant');
   }
 }
 
