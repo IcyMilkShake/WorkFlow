@@ -2055,9 +2055,6 @@ async function loadAssignments() {
     return { course: course.name, assignments };
   }))
 });
-
-  } catch (error) {
-    showError('Failed to load assignments: ' + error.message);
   } finally {
     isLoading = false;
     loadingMsg.style.display = 'none';
