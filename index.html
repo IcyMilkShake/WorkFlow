@@ -989,7 +989,8 @@
 // ==========================================
 const USE_MOCK_DATA = false;
 const GOOGLE_CLIENT_ID = '204169741443-lrnat59d7ob8ae63srsbg2ojefn1f51h.apps.googleusercontent.com';
-const GOOGLE_SCOPES = 'https://www.googleapis.com/auth/classroom.courses.readonly https://www.googleapis.com/auth/classroom.coursework.students.readonly https://www.googleapis.com/auth/classroom.student-submissions.students.readonly';
+const GOOGLE_SCOPES = 'https://www.googleapis.com/auth/classroom.courses.readonly https://www.googleapis.com/auth/classroom.coursework.students.readonly https://www.googleapis.com/auth/classroom.student-submissions.students.readonly https://www.googleapis.com/auth/userinfo.profile';
+const SCOPE_VERSION = 'v2.1'; // Update this to force re-login/token clear
 
 let googleTokenClient;
 let googleAccessToken = localStorage.getItem('googleAccessToken') || null;
@@ -1945,16 +1946,28 @@ async function loadAssignments() {
     const userinfo = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
       headers: { Authorization: `Bearer ${googleAccessToken}` }
     });
-    const pfp = await userinfo.json();
-    
-    const avatarDiv = document.querySelector('.user-avatar');
-    avatarDiv.style.backgroundImage = `url(${pfp.picture})`;
-    document.querySelector('.user-name').textContent = pfp.name;
+
+    if (userinfo.status === 401) {
+      showLoginScreen();
+      return;
+    }
+
+    if (userinfo.ok) {
+      const pfp = await userinfo.json();
+      const avatarDiv = document.querySelector('.user-avatar');
+      if (pfp.picture) avatarDiv.style.backgroundImage = `url(${pfp.picture})`;
+      if (pfp.name) document.querySelector('.user-name').textContent = pfp.name;
+    }
 
     const coursesResponse = await fetch(
-      'https://classroom.googleapis.com/v1/courses?courseStates=ACTIVE',
+      'https://classroom.googleapis.com/v1/courses?studentId=me&courseStates=ACTIVE',
       { headers: { 'Authorization': `Bearer ${googleAccessToken}` }}
     );
+
+    if (coursesResponse.status === 401) {
+      showLoginScreen();
+      return;
+    }
 
     if (!coursesResponse.ok) throw new Error('Failed to fetch courses');
 
@@ -1987,6 +2000,11 @@ async function loadAssignments() {
                 `https://classroom.googleapis.com/v1/courses/${course.id}/courseWork/${work.id}/studentSubmissions`,
                 { headers: { 'Authorization': `Bearer ${googleAccessToken}` }}
               );
+
+              if (submissionResponse.status === 403) {
+                  console.warn(`⚠️ Access denied (403) for course ${course.name} work ${work.title}. Ensure you are enrolled as a student.`);
+                  return null;
+              }
 
               let status = 'pending';
               if (submissionResponse.ok) {
@@ -2301,6 +2319,21 @@ function showToast(message) {
 // INITIALIZATION
 // ==========================================
 window.addEventListener('DOMContentLoaded', () => {
+  // Check scope version
+  const savedScopeVersion = localStorage.getItem('scopeVersion');
+  if (savedScopeVersion !== SCOPE_VERSION) {
+    console.log('🧹 Scope version mismatch. Clearing tokens to force re-consent.');
+    const theme = localStorage.getItem('theme'); // Preserve theme
+    const ignored = localStorage.getItem('ignoredCourses'); // Preserve preferences
+    localStorage.clear();
+    if (theme) localStorage.setItem('theme', theme);
+    if (ignored) localStorage.setItem('ignoredCourses', ignored);
+    localStorage.setItem('scopeVersion', SCOPE_VERSION);
+    // Reload to ensure clean state
+    window.location.reload();
+    return;
+  }
+
   initializeGoogleAuth();
   
   // Apply saved theme
