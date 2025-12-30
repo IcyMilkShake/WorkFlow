@@ -556,6 +556,7 @@
             padding: 1rem;
             border-radius: 12px;
             line-height: 1.6;
+            white-space: pre-wrap;
         }
 
         .chat-message.user .chat-content {
@@ -1000,6 +1001,8 @@ let currentTheme = localStorage.getItem('theme') || 'dark';
 let openaiApiKey = localStorage.getItem('openai_api_key') || null;
 let previousAssignmentStates = JSON.parse(localStorage.getItem('previousStates') || '{}');
 let completionHistory = JSON.parse(localStorage.getItem('completionHistory') || '{}');
+let isLoading = false;
+let conversationHistory = [];
 
 let statusChartInstance = null;
 let courseChartInstance = null;
@@ -1566,13 +1569,125 @@ function generateUpcomingDeadlines(upcomingAssignments) {
 // AI ASSISTANT
 // ==========================================
 function initAIAssistant() {
+  const chatInterface = document.getElementById('chatInterface');
+  const apiKeyPrompt = document.getElementById('apiKeyPrompt');
+  
+  if (isLoading) {
+    chatInterface.style.display = 'none';
+    apiKeyPrompt.style.display = 'none';
+    // Show a temporary loading state in the container
+    const container = document.getElementById('aiAssistantPage');
+    let loader = document.getElementById('aiLoadingIndicator');
+    if (!loader) {
+      loader = document.createElement('div');
+      loader.id = 'aiLoadingIndicator';
+      loader.className = 'loading';
+      loader.innerHTML = '🔮 Analyzing assignments...';
+      container.appendChild(loader);
+    }
+    loader.style.display = 'block';
+    return;
+  }
+
+  // Remove loader if exists
+  const loader = document.getElementById('aiLoadingIndicator');
+  if (loader) loader.style.display = 'none';
+
   if (openaiApiKey) {
-    document.getElementById('apiKeyPrompt').style.display = 'none';
-    document.getElementById('chatInterface').style.display = 'block';
+    apiKeyPrompt.style.display = 'none';
+    chatInterface.style.display = 'block';
     updateAIPendingCount();
+    
+    // Check if we should generate a proactive greeting (only once per session load)
+    if (!window.hasGeneratedGreeting) {
+      window.hasGeneratedGreeting = true;
+      generateProactiveGreeting();
+    }
   } else {
-    document.getElementById('apiKeyPrompt').style.display = 'block';
-    document.getElementById('chatInterface').style.display = 'none';
+    apiKeyPrompt.style.display = 'block';
+    chatInterface.style.display = 'none';
+  }
+}
+
+async function generateProactiveGreeting() {
+  if (isLoading) return;
+
+  const chatMessages = document.getElementById('chatMessages');
+  // Clear default message if it exists
+  if (chatMessages.children.length > 0) {
+    chatMessages.innerHTML = '';
+  }
+  
+  const typingDiv = addTypingIndicator();
+  
+  try {
+    const filtered = allAssignmentsData.filter(a => 
+      a.status !== 'submitted' && !ignoredCourses.has(a.courseName)
+    );
+
+    if (filtered.length === 0) {
+      typingDiv.remove();
+      addChatMessage("🎉 You're all caught up! No pending assignments. Relax and enjoy your free time!", 'assistant');
+      return;
+    }
+    
+    // Calculate context
+    const todayStr = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    const lateCount = filtered.filter(a => a.status === 'late').length;
+    const pendingCount = filtered.filter(a => a.status === 'pending').length;
+
+    const assignmentsContext = filtered.map(a => ({
+      title: a.title,
+      course: a.courseName,
+      description: a.description || '',
+      dueDate: a.dueDate ? `${a.dueDate.year}-${a.dueDate.month}-${a.dueDate.day}` : 'No due date',
+      status: a.status
+    }));
+    
+    const systemPrompt = `You are a proactive AI assistant.
+    TODAY IS ${todayStr}.
+    WORKLOAD: ${lateCount} Late, ${pendingCount} Pending.
+
+    Analyze the following assignments and generate a ONE-SENTENCE greeting that tells the user exactly what to focus on first.
+    Be urgent if something is late or due today. Be encouraging otherwise.
+    Start with "Hey there!" or similar.
+    
+    Assignments: ${JSON.stringify(assignmentsContext)}`;
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${openaiApiKey}`
+      },
+      body: JSON.stringify({
+        model: "gpt-5-mini",
+        messages: [
+          { role: 'system', content: systemPrompt }
+        ],
+        max_tokens: 100,
+        temperature: 0.7
+      })
+    });
+
+    if (!response.ok) throw new Error('API request failed');
+    
+    const data = await response.json();
+    const greeting = data.choices[0].message.content;
+    
+    // Add greeting to history so the AI remembers it
+    conversationHistory.push({ role: 'assistant', content: greeting });
+
+    typingDiv.remove();
+    addChatMessage(greeting, 'assistant');
+    
+  } catch (error) {
+    typingDiv.remove();
+    console.error('Greeting Error:', error);
+    // Fallback if API fails
+    const fallbackMsg = `Hi! I can see you have ${document.getElementById('aiPendingCount').textContent} pending assignments. How can I help?`;
+    conversationHistory.push({ role: 'assistant', content: fallbackMsg });
+    addChatMessage(fallbackMsg, 'assistant');
   }
 }
 
@@ -1613,26 +1728,59 @@ async function sendChatMessage() {
       a.status !== 'submitted' && !ignoredCourses.has(a.courseName)
     );
     
+    // Calculate summaries
+    const todayStr = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    const lateCount = filtered.filter(a => a.status === 'late').length;
+    const pendingCount = filtered.filter(a => a.status === 'pending').length;
+
     const assignmentsContext = filtered.map(a => ({
       title: a.title,
       course: a.courseName,
+      description: a.description || 'No description provided',
+      points: a.maxPoints || 'Ungraded',
       dueDate: a.dueDate ? `${a.dueDate.year}-${a.dueDate.month}-${a.dueDate.day}` : 'No due date',
       status: a.status
     }));
     
-    const systemPrompt = `You are a helpful AI study assistant for a student. The student currently has ${filtered.length} pending assignments:
+    const systemPrompt = `You are a smart, context-aware AI study assistant inside the "WorkFlow" PWA.
+    
+CONTEXT SUMMARY:
+- TODAY IS ${todayStr}.
+- Total Late: ${lateCount}
+- Total Pending: ${pendingCount}
 
+APP CAPABILITIES:
+- Users can view assignment trends on the Statistics page.
+- Users can toggle "Dark Mode", "Midnight Mode" or "Light Mode" in Settings.
+- Users can hide specific courses in the Courses page.
+- The app tracks productivity streaks and completion history.
+
+YOUR GOAL:
+- Analyze the user's workload using the assignment data provided below.
+- Answer user questions precisely based on the DATA.
+- Be specific. ALWAYS refer to assignments by their exact names.
+- Use the descriptions to judge difficulty.
+
+OFFICIAL ASSIGNMENT RECORDS (Trust this data):
 ${JSON.stringify(assignmentsContext, null, 2)}
 
-Help them with:
-- Prioritizing assignments based on due dates
-- Study strategies and time management
-- Breaking down large assignments
-- Motivation and stress management
-- General academic advice
+INSTRUCTIONS:
+1. **Date Awareness:** Compare due dates to the Current Date (${todayStr}). If a due date is in the past, it is LATE.
+2. **Strict Status:** Do not confuse 'late' and 'pending'. Use the 'status' field in the records.
+3. **Anti-Gullibility:** You have the source of truth. If the user claims they finished a task but it's marked 'late' here, politely correct them: "My records show 'Title' is still marked late. Did you forget to turn it in?"
+4. **Prioritization:** Only offer advice if asked or if items are overdue/due soon. Weigh due date AND points/difficulty.
+5. **Anti-Hallucination:** If asked about data not in the list, admit you don't know.
 
-Be encouraging, friendly, and practical. Keep answers concise (2-3 paragraphs max).`;
+Be concise, friendly, but authoritative about the data.`;
     
+    // Update conversation history
+    conversationHistory.push({ role: 'user', content: message });
+    
+    // Keep history manageable (last 10 messages)
+    if (conversationHistory.length > 10) {
+      conversationHistory = conversationHistory.slice(conversationHistory.length - 10);
+    }
+    console.log(assignmentsContext)
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -1640,10 +1788,10 @@ Be encouraging, friendly, and practical. Keep answers concise (2-3 paragraphs ma
         'Authorization': `Bearer ${openaiApiKey}`
       },
       body: JSON.stringify({
-        model: 'gpt-3.5-turbo',
+        model: "gpt-5-mini",
         messages: [
           { role: 'system', content: systemPrompt },
-          { role: 'user', content: message }
+          ...conversationHistory
         ],
         max_tokens: 500,
         temperature: 0.7
@@ -1659,6 +1807,9 @@ Be encouraging, friendly, and practical. Keep answers concise (2-3 paragraphs ma
     
     const data = await response.json();
     const aiMessage = data.choices[0].message.content;
+    
+    // Add AI response to history
+    conversationHistory.push({ role: 'assistant', content: aiMessage });
     
     typingDiv.remove();
     addChatMessage(aiMessage, 'assistant');
@@ -1740,10 +1891,63 @@ async function loadAssignments() {
   const loadingMsg = document.getElementById('loadingMsg');
   const assignmentsList = document.getElementById('assignmentsList');
   
+  isLoading = true;
   loadingMsg.style.display = 'block';
   assignmentsList.innerHTML = '';
+  updateAIViewIfActive();
 
   try {
+    if (USE_MOCK_DATA) {
+      document.querySelector('.user-name').textContent = 'Test Student';
+      
+      allCoursesData = [
+        { id: '1', name: 'AP Physics' },
+        { id: '2', name: 'World History' },
+        { id: '3', name: 'English Lit' }
+      ];
+
+      allAssignmentsData = [
+        {
+          source: 'google',
+          title: 'Lab Report: Kinematics',
+          courseName: 'AP Physics',
+          description: 'Write a full lab report on the projectile motion experiment. Include error analysis and graphs.',
+          maxPoints: 100,
+          dueDate: { year: 2024, month: 11, day: 20 },
+          status: 'late',
+          link: '#'
+        },
+        {
+          source: 'google',
+          title: 'Read Chapter 4',
+          courseName: 'World History',
+          description: 'Read chapter 4 and answer the review questions at the end.',
+          maxPoints: 10,
+          dueDate: { year: 2024, month: 11, day: 25 },
+          status: 'pending',
+          link: '#'
+        },
+        {
+          source: 'google',
+          title: 'Essay Draft',
+          courseName: 'English Lit',
+          description: 'Submit your first draft of the Macbeth analysis essay. Minimum 500 words.',
+          maxPoints: 50,
+          dueDate: { year: 2024, month: 11, day: 26 },
+          status: 'pending',
+          link: '#'
+        }
+      ];
+
+      // Simulate a small delay for realism
+      await new Promise(resolve => setTimeout(resolve, 800));
+      
+      checkForCompletions(allAssignmentsData);
+      displayAssignments(allAssignmentsData);
+      updateStats(allAssignmentsData);
+      return;
+    }
+
     const userinfo = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
       headers: { Authorization: `Bearer ${googleAccessToken}` }
     });
@@ -1805,6 +2009,8 @@ async function loadAssignments() {
                 source: 'google',
                 title: work.title,
                 courseName: course.name,
+                description: work.description,
+                maxPoints: work.maxPoints,
                 dueDate: work.dueDate,
                 dueTime: work.dueTime,
                 status: status,
@@ -1833,7 +2039,16 @@ async function loadAssignments() {
   } catch (error) {
     showError('Failed to load assignments: ' + error.message);
   } finally {
+    isLoading = false;
     loadingMsg.style.display = 'none';
+    updateAIViewIfActive();
+  }
+}
+
+function updateAIViewIfActive() {
+  const aiPage = document.getElementById('aiAssistantPage');
+  if (aiPage.style.display !== 'none') {
+    initAIAssistant();
   }
 }
 
@@ -2126,6 +2341,7 @@ document.getElementById('googleLoginBtn')?.addEventListener('click', () => {
   if (USE_MOCK_DATA) {
     googleAccessToken = 'MOCK_TOKEN';
     showDashboard();
+    loadAssignments();
     return;
   }
 
