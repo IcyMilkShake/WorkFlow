@@ -1645,7 +1645,7 @@ async function generateProactiveGreeting() {
     }));
 
     const systemPrompt = `You are a proactive AI assistant.
-    CURRENT DATE: ${todayStr}
+    TODAY IS ${todayStr}.
     WORKLOAD: ${lateCount} Late, ${pendingCount} Pending.
 
     Analyze the following assignments and generate a ONE-SENTENCE greeting that tells the user exactly what to focus on first.
@@ -1745,7 +1745,7 @@ async function sendChatMessage() {
     const systemPrompt = `You are a smart, context-aware AI study assistant inside the "WorkFlow" PWA.
 
 CONTEXT SUMMARY:
-- Current Date: ${todayStr}
+- TODAY IS ${todayStr}.
 - Total Late: ${lateCount}
 - Total Pending: ${pendingCount}
 
