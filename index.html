@@ -989,7 +989,7 @@
 // ==========================================
 const USE_MOCK_DATA = false;
 const GOOGLE_CLIENT_ID = '204169741443-lrnat59d7ob8ae63srsbg2ojefn1f51h.apps.googleusercontent.com';
-const GOOGLE_SCOPES = 'https://www.googleapis.com/auth/classroom.courses.readonly https://www.googleapis.com/auth/classroom.coursework.students.readonly https://www.googleapis.com/auth/classroom.student-submissions.students.readonly';
+const GOOGLE_SCOPES = 'https://www.googleapis.com/auth/classroom.courses.readonly https://www.googleapis.com/auth/classroom.coursework.me.readonly https://www.googleapis.com/auth/userinfo.profile';
 
 let googleTokenClient;
 let googleAccessToken = localStorage.getItem('googleAccessToken') || null;
@@ -1945,16 +1945,28 @@ async function loadAssignments() {
     const userinfo = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
       headers: { Authorization: `Bearer ${googleAccessToken}` }
     });
-    const pfp = await userinfo.json();
-    
-    const avatarDiv = document.querySelector('.user-avatar');
-    avatarDiv.style.backgroundImage = `url(${pfp.picture})`;
-    document.querySelector('.user-name').textContent = pfp.name;
+
+    if (userinfo.status === 401) {
+      showLoginScreen();
+      return;
+    }
+
+    if (userinfo.ok) {
+      const pfp = await userinfo.json();
+      const avatarDiv = document.querySelector('.user-avatar');
+      if (pfp.picture) avatarDiv.style.backgroundImage = `url(${pfp.picture})`;
+      if (pfp.name) document.querySelector('.user-name').textContent = pfp.name;
+    }
 
     const coursesResponse = await fetch(
-      'https://classroom.googleapis.com/v1/courses?courseStates=ACTIVE',
+      'https://classroom.googleapis.com/v1/courses?studentId=me&courseStates=ACTIVE',
       { headers: { 'Authorization': `Bearer ${googleAccessToken}` }}
     );
+
+    if (coursesResponse.status === 401) {
+      showLoginScreen();
+      return;
+    }
 
     if (!coursesResponse.ok) throw new Error('Failed to fetch courses');
 
