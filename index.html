@@ -1568,6 +1568,17 @@ function generateUpcomingDeadlines(upcomingAssignments) {
 // ==========================================
 // AI ASSISTANT
 // ==========================================
+function updateAIPendingCount() {
+  const countElement = document.getElementById('aiPendingCount');
+  if (!countElement) return;
+  
+  const filtered = allAssignmentsData.filter(a =>
+    a.status !== 'submitted' && !ignoredCourses.has(a.courseName)
+  );
+  
+  countElement.textContent = `${filtered.length} pending assignment${filtered.length !== 1 ? 's' : ''}`;
+}
+
 function initAIAssistant() {
   const chatInterface = document.getElementById('chatInterface');
   const apiKeyPrompt = document.getElementById('apiKeyPrompt');
@@ -1575,7 +1586,6 @@ function initAIAssistant() {
   if (isLoading) {
     chatInterface.style.display = 'none';
     apiKeyPrompt.style.display = 'none';
-    // Show a temporary loading state in the container
     const container = document.getElementById('aiAssistantPage');
     let loader = document.getElementById('aiLoadingIndicator');
     if (!loader) {
@@ -1589,7 +1599,6 @@ function initAIAssistant() {
     return;
   }
 
-  // Remove loader if exists
   const loader = document.getElementById('aiLoadingIndicator');
   if (loader) loader.style.display = 'none';
 
@@ -1598,7 +1607,6 @@ function initAIAssistant() {
     chatInterface.style.display = 'block';
     updateAIPendingCount();
     
-    // Check if we should generate a proactive greeting (only once per session load)
     if (!window.hasGeneratedGreeting) {
       window.hasGeneratedGreeting = true;
       generateProactiveGreeting();
@@ -1613,81 +1621,96 @@ async function generateProactiveGreeting() {
   if (isLoading) return;
 
   const chatMessages = document.getElementById('chatMessages');
-  // Clear default message if it exists
   if (chatMessages.children.length > 0) {
     chatMessages.innerHTML = '';
   }
-  
+
   const typingDiv = addTypingIndicator();
-  
+
   try {
-    const filtered = allAssignmentsData.filter(a => 
+    const filtered = allAssignmentsData.filter(a =>
       a.status !== 'submitted' && !ignoredCourses.has(a.courseName)
     );
 
     if (filtered.length === 0) {
       typingDiv.remove();
-      addChatMessage("🎉 You're all caught up! No pending assignments. Relax and enjoy your free time!", 'assistant');
+      addChatMessage("🎉 You're all caught up! No pending assignments.", 'assistant');
       return;
     }
-    
-    // Calculate context
-    const todayStr = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+    const todayStr = new Date().toLocaleDateString('en-US', {
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+    });
+
     const lateCount = filtered.filter(a => a.status === 'late').length;
     const pendingCount = filtered.filter(a => a.status === 'pending').length;
 
     const assignmentsContext = filtered.map(a => ({
       title: a.title,
       course: a.courseName,
-      description: a.description || '',
-      dueDate: a.dueDate ? `${a.dueDate.year}-${a.dueDate.month}-${a.dueDate.day}` : 'No due date',
+      description: a.description || 'No description provided',
+      points: a.maxPoints || 'Ungraded',
+      dueDate: a.dueDate
+        ? `${a.dueDate.year}-${a.dueDate.month}-${a.dueDate.day}`
+        : 'No due date',
       status: a.status
     }));
-    
-    const systemPrompt = `You are a proactive AI assistant.
-    TODAY IS ${todayStr}.
-    WORKLOAD: ${lateCount} Late, ${pendingCount} Pending.
 
-    Analyze the following assignments and generate a ONE-SENTENCE greeting that tells the user exactly what to focus on first.
-    Be urgent if something is late or due today. Be encouraging otherwise.
-    Start with "Hey there!" or similar.
-    
-    Assignments: ${JSON.stringify(assignmentsContext)}`;
+    const systemPrompt = `TODAY IS ${todayStr}
+WORKLOAD: ${lateCount} late, ${pendingCount} pending.
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
+Generate ONE sentence greeting telling the user what to focus on first.
+Be urgent if something is late.
+
+Assignments:
+${JSON.stringify(assignmentsContext)}`;
+
+    console.log('=== GREETING REQUEST ===');
+    console.log('System prompt:', systemPrompt);
+
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${openaiApiKey}`
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${openaiApiKey}`
       },
       body: JSON.stringify({
-        model: "gpt-5-mini",
+        model: "gpt-4o-mini",
         messages: [
-          { role: 'system', content: systemPrompt }
+          { role: "system", content: systemPrompt },
+          { role: "user", content: "Give me a brief greeting and tell me what to focus on first." }
         ],
-        max_tokens: 100,
-        temperature: 0.7
+        max_tokens: 100
       })
     });
 
-    if (!response.ok) throw new Error('API request failed');
-    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('=== GREETING API ERROR ===');
+      console.error('Status:', response.status);
+      console.error('Error:', errorText);
+      throw new Error("API request failed");
+    }
+
     const data = await response.json();
-    const greeting = data.choices[0].message.content;
+    console.log('=== GREETING API RESPONSE ===');
+    console.log('Full response:', data);
     
-    // Add greeting to history so the AI remembers it
-    conversationHistory.push({ role: 'assistant', content: greeting });
+    const greeting = data.choices[0].message.content;
+    console.log('Extracted greeting:', greeting);
+
+    conversationHistory.push({ role: "assistant", content: greeting });
 
     typingDiv.remove();
-    addChatMessage(greeting, 'assistant');
-    
+    addChatMessage(greeting, "assistant");
+
   } catch (error) {
     typingDiv.remove();
-    console.error('Greeting Error:', error);
-    // Fallback if API fails
-    const fallbackMsg = `Hi! I can see you have ${document.getElementById('aiPendingCount').textContent} pending assignments. How can I help?`;
-    conversationHistory.push({ role: 'assistant', content: fallbackMsg });
-    addChatMessage(fallbackMsg, 'assistant');
+    console.error("=== GREETING ERROR ===", error);
+
+    const fallback = "Hey there! Let's take a look at what you need to work on today.";
+    addChatMessage(fallback, "assistant");
+    conversationHistory.push({ role: 'assistant', content: fallback });
   }
 }
 
@@ -1705,31 +1728,25 @@ function saveApiKey() {
   showToast('✅ API key saved successfully!');
 }
 
-function updateAIPendingCount() {
-  const filtered = allAssignmentsData.filter(a => 
-    a.status !== 'submitted' && !ignoredCourses.has(a.courseName)
-  );
-  const element = document.getElementById('aiPendingCount');
-  if (element) element.textContent = filtered.length;
-}
-
 async function sendChatMessage() {
   const input = document.getElementById('chatInput');
   const message = input.value.trim();
   if (!message) return;
-  
+
   addChatMessage(message, 'user');
   input.value = '';
-  
+
   const typingDiv = addTypingIndicator();
-  
+
   try {
-    const filtered = allAssignmentsData.filter(a => 
+    const filtered = allAssignmentsData.filter(a =>
       a.status !== 'submitted' && !ignoredCourses.has(a.courseName)
     );
-    
-    // Calculate summaries
-    const todayStr = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+    const todayStr = new Date().toLocaleDateString('en-US', {
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+    });
+
     const lateCount = filtered.filter(a => a.status === 'late').length;
     const pendingCount = filtered.filter(a => a.status === 'pending').length;
 
@@ -1741,46 +1758,27 @@ async function sendChatMessage() {
       dueDate: a.dueDate ? `${a.dueDate.year}-${a.dueDate.month}-${a.dueDate.day}` : 'No due date',
       status: a.status
     }));
-    
-    const systemPrompt = `You are a smart, context-aware AI study assistant inside the "WorkFlow" PWA.
-    
-CONTEXT SUMMARY:
-- TODAY IS ${todayStr}.
-- Total Late: ${lateCount}
-- Total Pending: ${pendingCount}
 
-APP CAPABILITIES:
-- Users can view assignment trends on the Statistics page.
-- Users can toggle "Dark Mode", "Midnight Mode" or "Light Mode" in Settings.
-- Users can hide specific courses in the Courses page.
-- The app tracks productivity streaks and completion history.
+    const systemPrompt = `You are a smart, context-aware AI study assistant. Be concise and direct - keep responses brief when should.
 
-YOUR GOAL:
-- Analyze the user's workload using the assignment data provided below.
-- Answer user questions precisely based on the DATA.
-- Be specific. ALWAYS refer to assignments by their exact names.
-- Use the descriptions to judge difficulty.
+TODAY: ${todayStr}
+Late: ${lateCount}, Pending: ${pendingCount}
 
-OFFICIAL ASSIGNMENT RECORDS (Trust this data):
-${JSON.stringify(assignmentsContext, null, 2)}
+Analyze the assignments below and answer user questions accurately.
+Assignments:
+${JSON.stringify(assignmentsContext, null, 2)}`;
 
-INSTRUCTIONS:
-1. **Date Awareness:** Compare due dates to the Current Date (${todayStr}). If a due date is in the past, it is LATE.
-2. **Strict Status:** Do not confuse 'late' and 'pending'. Use the 'status' field in the records.
-3. **Anti-Gullibility:** You have the source of truth. If the user claims they finished a task but it's marked 'late' here, politely correct them: "My records show 'Title' is still marked late. Did you forget to turn it in?"
-4. **Prioritization:** Only offer advice if asked or if items are overdue/due soon. Weigh due date AND points/difficulty.
-5. **Anti-Hallucination:** If asked about data not in the list, admit you don't know.
-
-Be concise, friendly, but authoritative about the data.`;
-    
-    // Update conversation history
     conversationHistory.push({ role: 'user', content: message });
     
-    // Keep history manageable (last 10 messages)
-    if (conversationHistory.length > 10) {
-      conversationHistory = conversationHistory.slice(conversationHistory.length - 10);
-    }
-    console.log(assignmentsContext)
+    const messages = [
+      { role: 'system', content: systemPrompt },
+      ...conversationHistory.slice(-10)
+    ];
+
+    console.log('=== CHAT REQUEST ===');
+    console.log('User message:', message);
+    console.log('Conversation history length:', conversationHistory.length);
+
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -1788,40 +1786,36 @@ Be concise, friendly, but authoritative about the data.`;
         'Authorization': `Bearer ${openaiApiKey}`
       },
       body: JSON.stringify({
-        model: "gpt-5-mini",
-        messages: [
-          { role: 'system', content: systemPrompt },
-          ...conversationHistory
-        ],
-        max_tokens: 500,
-        temperature: 0.7
+        model: 'gpt-4o-mini',
+        messages: messages,
+        max_tokens: 500
       })
     });
-    
+
     if (!response.ok) {
-      if (response.status === 429) {
-        throw new Error('quota_exceeded');
-      }
+      const errText = await response.text();
+      console.error('=== CHAT API ERROR ===');
+      console.error('Status:', response.status);
+      console.error('Error:', errText);
       throw new Error('OpenAI API request failed');
     }
-    
+
     const data = await response.json();
+    console.log('=== CHAT API RESPONSE ===');
+    console.log('Full response:', data);
+    
     const aiMessage = data.choices[0].message.content;
-    
-    // Add AI response to history
+    console.log('Extracted message:', aiMessage);
+
     conversationHistory.push({ role: 'assistant', content: aiMessage });
-    
+
     typingDiv.remove();
     addChatMessage(aiMessage, 'assistant');
-    
+
   } catch (error) {
     typingDiv.remove();
-    if (error.message === 'quota_exceeded') {
-      addChatMessage('⚠️ It seems you have exceeded your OpenAI API quota or rate limit. If you just created your key, you may need to set up billing at platform.openai.com/account/billing.', 'assistant');
-    } else {
-      addChatMessage('Sorry, I encountered an error. Please check your API key and try again.', 'assistant');
-    }
-    console.error('AI Error:', error);
+    console.error('=== CHAT ERROR ===', error);
+    addChatMessage('⚠️ Sorry, I encountered an error. Please check your API key and try again.', 'assistant');
   }
 }
 
