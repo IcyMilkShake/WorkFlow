@@ -1631,6 +1631,11 @@ async function generateProactiveGreeting() {
       return;
     }
 
+    // Calculate context
+    const todayStr = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    const lateCount = filtered.filter(a => a.status === 'late').length;
+    const pendingCount = filtered.filter(a => a.status === 'pending').length;
+
     const assignmentsContext = filtered.map(a => ({
       title: a.title,
       course: a.courseName,
@@ -1640,6 +1645,9 @@ async function generateProactiveGreeting() {
     }));
 
     const systemPrompt = `You are a proactive AI assistant.
+    CURRENT DATE: ${todayStr}
+    WORKLOAD: ${lateCount} Late, ${pendingCount} Pending.
+
     Analyze the following assignments and generate a ONE-SENTENCE greeting that tells the user exactly what to focus on first.
     Be urgent if something is late or due today. Be encouraging otherwise.
     Start with "Hey there!" or similar.
@@ -1720,6 +1728,11 @@ async function sendChatMessage() {
       a.status !== 'submitted' && !ignoredCourses.has(a.courseName)
     );
     
+    // Calculate summaries
+    const todayStr = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    const lateCount = filtered.filter(a => a.status === 'late').length;
+    const pendingCount = filtered.filter(a => a.status === 'pending').length;
+
     const assignmentsContext = filtered.map(a => ({
       title: a.title,
       course: a.courseName,
@@ -1731,6 +1744,11 @@ async function sendChatMessage() {
     
     const systemPrompt = `You are a smart, context-aware AI study assistant inside the "WorkFlow" PWA.
 
+CONTEXT SUMMARY:
+- Current Date: ${todayStr}
+- Total Late: ${lateCount}
+- Total Pending: ${pendingCount}
+
 APP CAPABILITIES:
 - Users can view assignment trends on the Statistics page.
 - Users can toggle "Dark Mode" or "Midnight Mode" in Settings.
@@ -1739,21 +1757,22 @@ APP CAPABILITIES:
 
 YOUR GOAL:
 - Analyze the user's workload using the assignment data provided below.
-- Answer user questions precisely.
+- Answer user questions precisely based on the DATA.
 - Be specific. ALWAYS refer to assignments by their exact names.
-- Use the descriptions to judge difficulty (e.g., "The Lab Report looks heavy, start that first").
-- If the user has many late assignments, suggest checking the Statistics page for trends.
+- Use the descriptions to judge difficulty.
 
-CURRENT ASSIGNMENTS:
+OFFICIAL ASSIGNMENT RECORDS (Trust this data):
 ${JSON.stringify(assignmentsContext, null, 2)}
 
 INSTRUCTIONS:
-- Do not give generic advice like "check the due date." Instead say: "Since 'Math HW' is due tomorrow, do that first."
-- If asked "what is best to start," weigh the due date AND the description complexity/points.
-- Only offer prioritization advice if the user explicitly asks for it OR if a deadline is today/tomorrow. Otherwise, simply answer their question.
-- ANTI-HALLUCINATION: If asked about past completed assignments or data not shown above, admit you don't know. Do not make up facts.
-- Be concise, friendly, and proactive.`;
-    
+1. **Date Awareness:** Compare due dates to the Current Date (${todayStr}). If a due date is in the past, it is LATE.
+2. **Strict Status:** Do not confuse 'late' and 'pending'. Use the 'status' field in the records.
+3. **Anti-Gullibility:** You have the source of truth. If the user claims they finished a task but it's marked 'late' here, politely correct them: "My records show 'Title' is still marked late. Did you forget to turn it in?"
+4. **Prioritization:** Only offer advice if asked or if items are overdue/due soon. Weigh due date AND points/difficulty.
+5. **Anti-Hallucination:** If asked about data not in the list, admit you don't know.
+
+Be concise, friendly, but authoritative about the data.`;
+
     // Update conversation history
     conversationHistory.push({ role: 'user', content: message });
 
