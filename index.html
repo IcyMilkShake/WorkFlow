@@ -989,8 +989,8 @@
 // ==========================================
 const USE_MOCK_DATA = false;
 const GOOGLE_CLIENT_ID = '204169741443-lrnat59d7ob8ae63srsbg2ojefn1f51h.apps.googleusercontent.com';
-const GOOGLE_SCOPES = 'https://www.googleapis.com/auth/classroom.courses.readonly https://www.googleapis.com/auth/classroom.coursework.students.readonly https://www.googleapis.com/auth/classroom.student-submissions.students.readonly https://www.googleapis.com/auth/userinfo.profile';
-const SCOPE_VERSION = 'v2.1'; // Update this to force re-login/token clear
+const GOOGLE_SCOPES = 'https://www.googleapis.com/auth/classroom.courses.readonly https://www.googleapis.com/auth/classroom.coursework.students.readonly https://www.googleapis.com/auth/classroom.student-submissions.students.readonly https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/classroom.coursework.me.readonly https://www.googleapis.com/auth/classroom.student-submissions.me.readonly';
+const SCOPE_VERSION = 'v2.2'; // Update this to force re-login/token clear
 
 let googleTokenClient;
 let googleAccessToken = localStorage.getItem('googleAccessToken') || null;

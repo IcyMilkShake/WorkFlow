@@ -1,4 +1,4 @@
-const CACHE_NAME = 'workflow-v2.0.1';
+const CACHE_NAME = 'workflow-v2.0.2';
 const RUNTIME_CACHE = 'workflow-runtime';
 
 const PRECACHE_URLS = [
@@ -28,7 +28,7 @@ const NOTIFICATION_MESSAGES = {
 
 // Install event
 self.addEventListener('install', (event) => {
-  console.log('Service Worker: Installing v2.0.1...');
+  console.log('Service Worker: Installing v2.0.2...');
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => cache.addAll(PRECACHE_URLS))
