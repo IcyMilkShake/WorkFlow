@@ -2029,7 +2029,21 @@ async function loadAssignments() {
     checkForCompletions(flatAssignments);
     displayAssignments(flatAssignments);
     updateStats(flatAssignments);
-    
+    console.log('DEBUG: Courses and Coursework for current user:', {
+  user: pfp.name,
+  courses: courses.map(c => ({ id: c.id, name: c.name })),
+  assignmentsPerCourse: await Promise.all(courses.map(async (course) => {
+    const courseworkResponse = await fetch(
+      `https://classroom.googleapis.com/v1/courses/${course.id}/courseWork`,
+      { headers: { 'Authorization': `Bearer ${googleAccessToken}` }}
+    );
+    if (!courseworkResponse.ok) return { course: course.name, error: courseworkResponse.status };
+    const courseworkData = await courseworkResponse.json();
+    const assignments = (courseworkData.courseWork || []).map(a => ({ id: a.id, title: a.title }));
+    return { course: course.name, assignments };
+  }))
+});
+
   } catch (error) {
     showError('Failed to load assignments: ' + error.message);
   } finally {
