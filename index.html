@@ -997,7 +997,7 @@ let allAssignmentsData = [];
 let allCoursesData = [];
 let ignoredCourses = new Set(JSON.parse(localStorage.getItem('ignoredCourses') || '[]'));
 let currentTheme = localStorage.getItem('theme') || 'dark';
-let openaiApiKey = localStorage.getItem('openai_api_key') || null;
+let openaiApiKey = "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"
 let previousAssignmentStates = JSON.parse(localStorage.getItem('previousStates') || '{}');
 let completionHistory = JSON.parse(localStorage.getItem('completionHistory') || '{}');
 let isLoading = false;
@@ -1007,7 +1007,6 @@ let statusChartInstance = null;
 let courseChartInstance = null;
 let productivityChartInstance = null;
 let currentProductivityView = 'week';
-
 // ==========================================
 // SERVICE WORKER & PWA INITIALIZATION
 // ==========================================
@@ -1711,20 +1710,6 @@ ${JSON.stringify(assignmentsContext)}`;
     addChatMessage(fallback, "assistant");
     conversationHistory.push({ role: 'assistant', content: fallback });
   }
-}
-
-function saveApiKey() {
-  const key = document.getElementById('apiKeyInput').value.trim();
-  
-  if (!key.startsWith('sk-')) {
-    showToast('❌ Invalid API key format. Should start with sk-');
-    return;
-  }
-  
-  openaiApiKey = key;
-  localStorage.setItem('openai_api_key', key);
-  initAIAssistant();
-  showToast('✅ API key saved successfully!');
 }
 
 async function sendChatMessage() {
