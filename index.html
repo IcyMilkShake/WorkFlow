@@ -885,20 +885,6 @@
                         </p>
                     </div>
 
-                    <div id="apiKeyPrompt" class="card" style="display: none;">
-                        <div class="card-title">🔑 OpenAI API Key Required</div>
-                        <p style="color: var(--text-secondary); margin-bottom: 1rem;">
-                            To use the AI Assistant, please enter your OpenAI API key:
-                        </p>
-                        <div style="display: flex; gap: 1rem;">
-                            <input type="password" id="apiKeyInput" placeholder="sk-proj-..." style="flex: 1; background: var(--dark); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem; color: var(--text-primary); font-family: 'Poppins', sans-serif;">
-                            <button class="btn btn-primary" onclick="saveApiKey()">Save</button>
-                        </div>
-                        <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.5rem;">
-                            Get your API key from <a href="https://platform.openai.com/api-keys" target="_blank" style="color: var(--primary);">platform.openai.com/api-keys</a>
-                        </p>
-                    </div>
-
                     <div id="chatInterface" style="display: none;">
                         <div class="chat-container">
                             <div class="chat-messages" id="chatMessages">
@@ -989,7 +975,7 @@
 const USE_MOCK_DATA = false;
 const GOOGLE_CLIENT_ID = '204169741443-lrnat59d7ob8ae63srsbg2ojefn1f51h.apps.googleusercontent.com';
 const GOOGLE_SCOPES = 'https://www.googleapis.com/auth/classroom.courses.readonly https://www.googleapis.com/auth/classroom.coursework.me.readonly https://www.googleapis.com/auth/userinfo.profile';
-require('dotenv').config();
+
 // ==========================================
 // GLOBAL VARIABLES
 // ==========================================
@@ -1001,7 +987,6 @@ let allAssignmentsData = [];
 let allCoursesData = [];
 let ignoredCourses = new Set(JSON.parse(localStorage.getItem('ignoredCourses') || '[]'));
 let currentTheme = localStorage.getItem('theme') || 'dark';
-let openaiApiKey = process.env.OPENAI_KEY;
 let previousAssignmentStates = JSON.parse(localStorage.getItem('previousStates') || '{}');
 let completionHistory = JSON.parse(localStorage.getItem('completionHistory') || '{}');
 let isLoading = false;
@@ -1583,11 +1568,9 @@ function updateAIPendingCount() {
 
 function initAIAssistant() {
   const chatInterface = document.getElementById('chatInterface');
-  const apiKeyPrompt = document.getElementById('apiKeyPrompt');
   
   if (isLoading) {
     chatInterface.style.display = 'none';
-    apiKeyPrompt.style.display = 'none';
     const container = document.getElementById('aiAssistantPage');
     let loader = document.getElementById('aiLoadingIndicator');
     if (!loader) {
@@ -1604,18 +1587,12 @@ function initAIAssistant() {
   const loader = document.getElementById('aiLoadingIndicator');
   if (loader) loader.style.display = 'none';
 
-  if (openaiApiKey) {
-    apiKeyPrompt.style.display = 'none';
-    chatInterface.style.display = 'block';
-    updateAIPendingCount();
-    
-    if (!window.hasGeneratedGreeting) {
-      window.hasGeneratedGreeting = true;
-      generateProactiveGreeting();
-    }
-  } else {
-    apiKeyPrompt.style.display = 'block';
-    chatInterface.style.display = 'none';
+  chatInterface.style.display = 'block';
+  updateAIPendingCount();
+  
+  if (!window.hasGeneratedGreeting) {
+    window.hasGeneratedGreeting = true;
+    generateProactiveGreeting();
   }
 }
 
@@ -1670,11 +1647,10 @@ ${JSON.stringify(assignmentsContext)}`;
     console.log('=== GREETING REQUEST ===');
     console.log('System prompt:', systemPrompt);
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    const response = await fetch("/api/chat", {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${openaiApiKey}`
+        "Content-Type": "application/json"
       },
       body: JSON.stringify({
         model: "gpt-4o-mini",
@@ -1767,11 +1743,10 @@ ${JSON.stringify(assignmentsContext, null, 2)}`;
     console.log('User message:', message);
     console.log('Conversation history length:', conversationHistory.length);
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const response = await fetch('/api/chat', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${openaiApiKey}`
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
         model: 'gpt-4o-mini',

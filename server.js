@@ -1,6 +1,9 @@
+require('dotenv').config();
 const express = require('express');
 const path = require('path');
 const app = express();
+
+app.use(express.json());
 
 // Trust proxy (crucial for AWS/Nginx/Load Balancers to get correct IP/Protocol)
 app.enable('trust proxy');
@@ -51,6 +54,32 @@ app.use('/node_modules', express.static(path.join(__dirname, 'node_modules')));
 
 // Serve static files (HTML, CSS, JS, icons)
 app.use(express.static(path.join(__dirname, '/')));
+  console.log(process.env.OPENAI_KEY)
+// Proxy endpoint for OpenAI Chat
+app.post('/api/chat', async (req, res) => {
+  try {
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${process.env.OPENAI_KEY}`
+      },
+      body: JSON.stringify(req.body)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('OpenAI API Error:', response.status, errorText);
+      return res.status(response.status).send(errorText);
+    }
+
+    const data = await response.json();
+    res.json(data);
+  } catch (error) {
+    console.error('Proxy Error:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
 
 // Fallback to index.html for SPA routing (Client-side routing)
 app.get('', (req, res) => {
