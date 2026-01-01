@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
     
     <!-- PWA Meta Tags -->
     <link rel="manifest" href="/manifest.json">
@@ -86,6 +87,9 @@
 
         .sidebar-brand-icon {
             font-size: 2rem;
+            display: flex;
+            align-items: center;
+            color: var(--primary);
         }
 
         .sidebar-brand-text {
@@ -123,7 +127,10 @@
 
         .sidebar-menu-icon {
             font-size: 1.2rem;
-            width: 20px;
+            width: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .main-panel {
@@ -254,6 +261,7 @@
             justify-content: space-between;
             align-items: center;
             transition: all 0.3s;
+            border-left: 4px solid transparent;
         }
 
         .stat-card:hover {
@@ -280,31 +288,43 @@
             align-items: center;
             justify-content: center;
             font-size: 2rem;
+            background: rgba(255, 255, 255, 0.05); /* Default background */
         }
 
+        .stat-card.primary { border-left-color: var(--primary); }
         .stat-card.primary .stat-icon {
             background: rgba(182, 109, 255, 0.2);
             color: var(--primary);
         }
 
+        .stat-card.success { border-left-color: var(--secondary); }
         .stat-card.success .stat-icon {
             background: rgba(0, 210, 91, 0.2);
             color: var(--secondary);
         }
 
+        .stat-card.warning { border-left-color: var(--warning); }
         .stat-card.warning .stat-icon {
             background: rgba(255, 171, 0, 0.2);
             color: var(--warning);
         }
 
+        .stat-card.danger { border-left-color: var(--danger); }
         .stat-card.danger .stat-icon {
             background: rgba(252, 66, 74, 0.2);
             color: var(--danger);
         }
 
+        .stat-card.info { border-left-color: var(--info); }
         .stat-card.info .stat-icon {
             background: rgba(0, 208, 255, 0.2);
             color: var(--info);
+        }
+
+        .stat-card.streak { border-left-color: #ff5722; }
+        .stat-card.streak .stat-icon {
+            background: rgba(255, 87, 34, 0.2);
+            color: #ff5722;
         }
 
         .assignments-grid {
@@ -548,10 +568,11 @@
             height: 40px;
             border-radius: 50%;
             background: var(--primary);
+            color: white;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.25rem;
+            font-size: 1.5rem;
             flex-shrink: 0;
         }
 
@@ -638,6 +659,15 @@
             padding-right: 1rem;
         }
 
+        .sidebar-section-label {
+            padding: 1.5rem 1.875rem 0.5rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
         .sidebar-backdrop {
             position: fixed;
             top: 0;
@@ -679,7 +709,9 @@
     <!-- Login Page -->
     <div class="auth-page" id="loginPage">
         <div class="auth-card">
-            <div class="sidebar-brand-icon">📊</div>
+            <div class="sidebar-brand-icon" style="justify-content: center; margin-bottom: 1rem;">
+                <img src="/icons/icon-192x192.png" alt="WorkFlow Logo" style="width: 60px; height: 60px;">
+            </div>
             <h2>WorkFlow</h2>
             <p>Track Google Classroom assignments with AI assistance & productivity insights</p>
             
@@ -703,28 +735,33 @@
         <!-- Sidebar -->
         <nav class="sidebar">
             <div class="sidebar-brand">
-                <span class="sidebar-brand-icon">📊</span>
+                <span class="sidebar-brand-icon">
+                    <img src="/icons/icon-192x192.png" alt="Logo" style="width: 32px; height: 32px;">
+                </span>
                 <span class="sidebar-brand-text">WorkFlow</span>
             </div>
             <div class="sidebar-menu">
                 <a class="sidebar-menu-item active" onclick="showPage('assignments')">
-                    <span class="sidebar-menu-icon">📝</span>
+                    <span class="sidebar-menu-icon"><i class="ph ph-clipboard-text"></i></span>
                     <span>Assignments</span>
                 </a>
                 <a class="sidebar-menu-item" onclick="showPage('statistics')">
-                    <span class="sidebar-menu-icon">📊</span>
+                    <span class="sidebar-menu-icon"><i class="ph ph-chart-bar"></i></span>
                     <span>Statistics</span>
                 </a>
                 <a class="sidebar-menu-item" onclick="showPage('ai-assistant')">
-                    <span class="sidebar-menu-icon">🤖</span>
+                    <span class="sidebar-menu-icon"><i class="ph ph-magic-wand"></i></span>
                     <span>AI Assistant</span>
                 </a>
+                
+                <div class="sidebar-section-label">Preferences</div>
+
                 <a class="sidebar-menu-item" onclick="showPage('courses')">
-                    <span class="sidebar-menu-icon">📚</span>
+                    <span class="sidebar-menu-icon"><i class="ph ph-books"></i></span>
                     <span>Courses</span>
                 </a>
                 <a class="sidebar-menu-item" onclick="showPage('settings')">
-                    <span class="sidebar-menu-icon">⚙️</span>
+                    <span class="sidebar-menu-icon"><i class="ph ph-gear"></i></span>
                     <span>Settings</span>
                 </a>
             </div>
@@ -755,8 +792,11 @@
                 <!-- Assignments Page -->
                 <div id="assignmentsPage">
                     <div id="notificationPermission" class="notification-permission" style="display: none;">
+                        <div style="font-size: 1.5rem; color: var(--warning); display: flex; align-items: center; justify-content: center; margin-right: 1rem;">
+                            <i class="ph ph-bell-ringing"></i>
+                        </div>
                         <div style="flex: 1;">
-                            <strong>📬 Enable Notifications</strong>
+                            <strong>Enable Notifications</strong>
                             <p style="font-size: 0.875rem; color: var(--text-secondary); margin: 0.25rem 0 0;">
                                 Get comedic reminders when assignments are due soon!
                             </p>
@@ -779,28 +819,28 @@
                                 <h3 id="totalCount">0</h3>
                                 <div class="stat-label">Total Assignments</div>
                             </div>
-                            <div class="stat-icon">📚</div>
+                            <div class="stat-icon"><i class="ph ph-stack"></i></div>
                         </div>
                         <div class="stat-card warning">
                             <div class="stat-info">
                                 <h3 id="pendingCount">0</h3>
                                 <div class="stat-label">Pending</div>
                             </div>
-                            <div class="stat-icon">⏳</div>
+                            <div class="stat-icon"><i class="ph ph-hourglass"></i></div>
                         </div>
                         <div class="stat-card danger">
                             <div class="stat-info">
                                 <h3 id="lateCount">0</h3>
                                 <div class="stat-label">Late</div>
                             </div>
-                            <div class="stat-icon">⚠️</div>
+                            <div class="stat-icon"><i class="ph ph-warning-circle"></i></div>
                         </div>
                         <div class="stat-card success">
                             <div class="stat-info">
                                 <h3 id="dueToday">0</h3>
                                 <div class="stat-label">Due Today</div>
                             </div>
-                            <div class="stat-icon">🎯</div>
+                            <div class="stat-icon"><i class="ph ph-target"></i></div>
                         </div>
                     </div>
 
@@ -828,28 +868,28 @@
                                 <h3 id="upcomingWeek">0</h3>
                                 <div class="stat-label">Due This Week</div>
                             </div>
-                            <div class="stat-icon">📅</div>
+                            <div class="stat-icon"><i class="ph ph-calendar"></i></div>
                         </div>
                         <div class="stat-card danger">
                             <div class="stat-info">
                                 <h3 id="overdueTotal">0</h3>
                                 <div class="stat-label">Total Overdue</div>
                             </div>
-                            <div class="stat-icon">🚨</div>
+                            <div class="stat-icon"><i class="ph ph-siren"></i></div>
                         </div>
                         <div class="stat-card primary">
                             <div class="stat-info">
                                 <h3 id="totalCourses">0</h3>
                                 <div class="stat-label">Active Courses</div>
                             </div>
-                            <div class="stat-icon">📚</div>
+                            <div class="stat-icon"><i class="ph ph-books"></i></div>
                         </div>
                         <div class="stat-card success">
                             <div class="stat-info">
                                 <h3 id="avgPerCourse">0</h3>
                                 <div class="stat-label">Avg per Course</div>
                             </div>
-                            <div class="stat-icon">📊</div>
+                            <div class="stat-icon"><i class="ph ph-chart-line"></i></div>
                         </div>
                     </div>
 
@@ -866,12 +906,12 @@
                     </div>
 
                     <div class="card">
-                        <div class="card-title">📅 Upcoming Deadlines (Next 7 Days)</div>
+                        <div class="card-title"><i class="ph ph-calendar-check" style="margin-right: 0.5rem; color: var(--primary);"></i>Upcoming Deadlines (Next 7 Days)</div>
                         <div id="upcomingDeadlines" style="margin-top: 1rem;"></div>
                     </div>
 
                     <div class="page-header" style="margin-top: 3rem;">
-                        <h3>📈 Your Productivity</h3>
+                        <h3><i class="ph ph-trend-up" style="margin-right: 0.5rem; color: var(--primary);"></i>Your Productivity</h3>
                         <p style="color: var(--text-secondary);">Track your assignment completion over time</p>
                     </div>
                     
@@ -881,33 +921,33 @@
                                 <h3 id="completedToday">0</h3>
                                 <div class="stat-label">Completed Today</div>
                             </div>
-                            <div class="stat-icon">✅</div>
+                            <div class="stat-icon"><i class="ph ph-check-circle"></i></div>
                         </div>
-                        <div class="stat-card primary">
+                        <div class="stat-card streak">
                             <div class="stat-info">
                                 <h3 id="currentStreak">0</h3>
                                 <div class="stat-label">Day Streak</div>
                             </div>
-                            <div class="stat-icon">🔥</div>
+                            <div class="stat-icon"><i class="ph ph-fire"></i></div>
                         </div>
                         <div class="stat-card warning">
                             <div class="stat-info">
                                 <h3 id="weeklyAvg">0</h3>
                                 <div class="stat-label">Weekly Average</div>
                             </div>
-                            <div class="stat-icon">📊</div>
+                            <div class="stat-icon"><i class="ph ph-chart-bar"></i></div>
                         </div>
                         <div class="stat-card info">
                             <div class="stat-info">
                                 <h3 id="totalCompleted">0</h3>
                                 <div class="stat-label">Total Completed</div>
                             </div>
-                            <div class="stat-icon">🎯</div>
+                            <div class="stat-icon"><i class="ph ph-trophy"></i></div>
                         </div>
                     </div>
 
                     <div class="card">
-                        <div class="card-title">📊 Productivity Trends</div>
+                        <div class="card-title"><i class="ph ph-chart-line-up" style="margin-right: 0.5rem; color: var(--primary);"></i>Productivity Trends</div>
                         <div class="time-selector">
                             <button class="time-btn active" onclick="changeProductivityView('today')" data-view="today">Today</button>
                             <button class="time-btn" onclick="changeProductivityView('week')" data-view="week">7 Days</button>
@@ -920,7 +960,7 @@
                 <!-- AI Assistant Page -->
                 <div id="aiAssistantPage" style="display: none;">
                     <div class="page-header">
-                        <h3>🤖 AI Study Assistant</h3>
+                        <h3><i class="ph ph-magic-wand" style="margin-right: 0.5rem; color: var(--primary);"></i>AI Study Assistant</h3>
                         <p style="color: var(--text-secondary);">
                             Chat with AI about your assignments, get study tips, and manage your workload better!
                         </p>
@@ -930,7 +970,12 @@
                         <div class="chat-container">
                             <div class="chat-messages" id="chatMessages">
                                 <div class="chat-message">
-                                    <div class="chat-avatar">🤖</div>
+                                    <div class="chat-avatar">
+                                        <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" version="1.1" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" style="width: 24px; height: 24px;">
+                                            <rect height="7.5" width="12.5" y="5.75" x="1.75"></rect> 
+                                            <path d="m10.75 8.75v1.5m-5.5-1.5v1.5m-.5-7.5 3.25 3 3.25-3"></path> 
+                                        </svg>
+                                    </div>
                                     <div class="chat-content">
                                         Hi! I'm your AI study assistant. I can see you have <strong id="aiPendingCount">0</strong> pending assignments. How can I help you today?
                                     </div>
@@ -947,7 +992,7 @@
                 <!-- Courses Page -->
                 <div id="coursesPage" style="display: none;">
                     <div class="page-header">
-                        <h3>📚 My Courses</h3>
+                        <h3><i class="ph ph-books" style="margin-right: 0.5rem; color: var(--primary);"></i>My Courses</h3>
                         <div class="breadcrumb">
                             <span>Home</span>
                             <span>/</span>
@@ -964,7 +1009,7 @@
                 <!-- Settings Page -->
                 <div id="settingsPage" style="display: none;">
                     <div class="page-header">
-                        <h3>⚙️ Settings</h3>
+                        <h3><i class="ph ph-gear" style="margin-right: 0.5rem; color: var(--primary);"></i>Settings</h3>
                         <div class="breadcrumb">
                             <span>Home</span>
                             <span>/</span>
@@ -972,7 +1017,7 @@
                         </div>
                     </div>
                     <div class="card">
-                        <div class="card-title">🎨 Appearance</div>
+                        <div class="card-title"><i class="ph ph-palette" style="margin-right: 0.5rem; color: var(--primary);"></i>Appearance</div>
                         <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">Choose your preferred theme</p>
                         
                         <div style="display: grid; gap: 1rem;">
@@ -1036,7 +1081,7 @@ let conversationHistory = [];
 let statusChartInstance = null;
 let courseChartInstance = null;
 let productivityChartInstance = null;
-let currentProductivityView = 'week';
+let currentProductivityView = 'today';
 // ==========================================
 // SERVICE WORKER & PWA INITIALIZATION
 // ==========================================
@@ -1469,7 +1514,7 @@ function generateStatusChart(assignments) {
     ctx.parentElement.innerHTML = `
       <div class="card-title">Assignment Status Distribution</div>
       <div class="empty-state">
-        <div class="empty-state-icon">🎉</div>
+        <div class="empty-state-icon"><i class="ph ph-confetti"></i></div>
         <h3>No pending assignments!</h3>
         <p>You're all caught up.</p>
       </div>
@@ -1537,7 +1582,7 @@ function generateCourseChart(assignments) {
     ctx.parentElement.innerHTML = `
       <div class="card-title">Assignments by Course</div>
       <div class="empty-state">
-        <div class="empty-state-icon">🎉</div>
+        <div class="empty-state-icon"><i class="ph ph-confetti"></i></div>
         <h3>No pending assignments!</h3>
         <p>You're all caught up.</p>
       </div>
@@ -1607,7 +1652,7 @@ function generateUpcomingDeadlines(upcomingAssignments) {
   if (upcomingAssignments.length === 0) {
     container.innerHTML = `
       <div style="text-align: center; padding: 2rem; color: var(--text-secondary);">
-        <div style="font-size: 3rem; margin-bottom: 0.5rem;">🎉</div>
+        <div style="font-size: 3rem; margin-bottom: 0.5rem; color: var(--primary);"><i class="ph ph-confetti"></i></div>
         <div>No assignments due in the next 7 days!</div>
       </div>
     `;
@@ -1877,7 +1922,14 @@ function addChatMessage(content, sender) {
   
   const avatar = document.createElement('div');
   avatar.className = 'chat-avatar';
-  avatar.textContent = sender === 'user' ? '👤' : '🤖';
+  if (sender === 'user') {
+      avatar.innerHTML = '<i class="ph ph-user"></i>';
+  } else {
+      avatar.innerHTML = `<svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" version="1.1" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" style="width: 24px; height: 24px;">
+          <rect height="7.5" width="12.5" y="5.75" x="1.75"></rect> 
+          <path d="m10.75 8.75v1.5m-5.5-1.5v1.5m-.5-7.5 3.25 3 3.25-3"></path> 
+      </svg>`;
+  }
   
   const contentDiv = document.createElement('div');
   contentDiv.className = 'chat-content';
@@ -1895,7 +1947,12 @@ function addTypingIndicator() {
   const typingDiv = document.createElement('div');
   typingDiv.className = 'chat-message';
   typingDiv.innerHTML = `
-    <div class="chat-avatar">🤖</div>
+    <div class="chat-avatar">
+        <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" version="1.1" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" style="width: 24px; height: 24px;">
+            <rect height="7.5" width="12.5" y="5.75" x="1.75"></rect> 
+            <path d="m10.75 8.75v1.5m-5.5-1.5v1.5m-.5-7.5 3.25 3 3.25-3"></path> 
+        </svg>
+    </div>
     <div class="chat-content"><span style="opacity: 0.6;">Thinking...</span></div>
   `;
   
@@ -2153,7 +2210,7 @@ function displayAssignments(assignments) {
   if (pendingAssignments.length === 0) {
     assignmentsList.innerHTML = `
       <div class="empty-state">
-        <div class="empty-state-icon">🎉</div>
+        <div class="empty-state-icon"><i class="ph ph-confetti"></i></div>
         <h3>All caught up!</h3>
         <p>You have no pending assignments.</p>
       </div>
@@ -2173,7 +2230,7 @@ function displayAssignments(assignments) {
     const dueDate = formatDueDate(assignment);
     const statusClass = assignment.status;
     const statusText = assignment.status === 'late' ? 'Late' : 'Pending';
-    const statusIcon = assignment.status === 'late' ? '⚠️' : '⏳';
+    const statusIcon = assignment.status === 'late' ? '<i class="ph ph-warning"></i>' : '<i class="ph ph-hourglass"></i>';
 
     return `
       <div class="assignment-card" onclick="window.open('${assignment.link}', '_blank')">
@@ -2257,7 +2314,7 @@ function displayCourses() {
   const coursesList = document.getElementById('coursesList');
   
   if (allCoursesData.length === 0) {
-    coursesList.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📚</div><h3>No courses found</h3></div>';
+    coursesList.innerHTML = '<div class="empty-state"><div class="empty-state-icon"><i class="ph ph-books"></i></div><h3>No courses found</h3></div>';
     return;
   }
 
