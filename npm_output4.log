@@ -2,7 +2,7 @@
 > start
 > node server.js
 
-[dotenv@17.2.3] injecting env (0) from .env -- tip: ⚙️  specify custom .env file path with { path: '/custom/path/.env' }
+[dotenv@17.2.3] injecting env (0) from .env -- tip: 🗂️ backup and recover secrets: https://dotenvx.com/ops
 undefined
 🚀 Server running on port 8080
 📱 PWA ready for installation
@@ -11,4 +11,3 @@ undefined
   - Offline support
   - Auto-updates
   - Install prompts
-Terminated

@@ -261,6 +261,7 @@
             justify-content: space-between;
             align-items: center;
             transition: all 0.3s;
+            border-left: 4px solid transparent;
         }
 
         .stat-card:hover {
@@ -290,29 +291,40 @@
             background: rgba(255, 255, 255, 0.05); /* Default background */
         }
 
+        .stat-card.primary { border-left-color: var(--primary); }
         .stat-card.primary .stat-icon {
             background: rgba(182, 109, 255, 0.2);
             color: var(--primary);
         }
 
+        .stat-card.success { border-left-color: var(--secondary); }
         .stat-card.success .stat-icon {
             background: rgba(0, 210, 91, 0.2);
             color: var(--secondary);
         }
 
+        .stat-card.warning { border-left-color: var(--warning); }
         .stat-card.warning .stat-icon {
             background: rgba(255, 171, 0, 0.2);
             color: var(--warning);
         }
 
+        .stat-card.danger { border-left-color: var(--danger); }
         .stat-card.danger .stat-icon {
             background: rgba(252, 66, 74, 0.2);
             color: var(--danger);
         }
 
+        .stat-card.info { border-left-color: var(--info); }
         .stat-card.info .stat-icon {
             background: rgba(0, 208, 255, 0.2);
             color: var(--info);
+        }
+
+        .stat-card.streak { border-left-color: #ff5722; }
+        .stat-card.streak .stat-icon {
+            background: rgba(255, 87, 34, 0.2);
+            color: #ff5722;
         }
 
         .assignments-grid {
@@ -647,6 +659,15 @@
             padding-right: 1rem;
         }
 
+        .sidebar-section-label {
+            padding: 1.5rem 1.875rem 0.5rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
         .sidebar-backdrop {
             position: fixed;
             top: 0;
@@ -732,6 +753,9 @@
                     <span class="sidebar-menu-icon"><i class="ph ph-magic-wand"></i></span>
                     <span>AI Assistant</span>
                 </a>
+
+                <div class="sidebar-section-label">Preferences</div>
+
                 <a class="sidebar-menu-item" onclick="showPage('courses')">
                     <span class="sidebar-menu-icon"><i class="ph ph-books"></i></span>
                     <span>Courses</span>
@@ -899,7 +923,7 @@
                             </div>
                             <div class="stat-icon"><i class="ph ph-check-circle"></i></div>
                         </div>
-                        <div class="stat-card primary">
+                        <div class="stat-card streak">
                             <div class="stat-info">
                                 <h3 id="currentStreak">0</h3>
                                 <div class="stat-label">Day Streak</div>
@@ -946,7 +970,12 @@
                         <div class="chat-container">
                             <div class="chat-messages" id="chatMessages">
                                 <div class="chat-message">
-                                    <div class="chat-avatar"><i class="ph ph-robot"></i></div>
+                                    <div class="chat-avatar">
+                                        <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" version="1.1" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" style="width: 24px; height: 24px;">
+                                            <rect height="7.5" width="12.5" y="5.75" x="1.75"></rect>
+                                            <path d="m10.75 8.75v1.5m-5.5-1.5v1.5m-.5-7.5 3.25 3 3.25-3"></path>
+                                        </svg>
+                                    </div>
                                     <div class="chat-content">
                                         Hi! I'm your AI study assistant. I can see you have <strong id="aiPendingCount">0</strong> pending assignments. How can I help you today?
                                     </div>
@@ -1052,7 +1081,7 @@ let conversationHistory = [];
 let statusChartInstance = null;
 let courseChartInstance = null;
 let productivityChartInstance = null;
-let currentProductivityView = 'week';
+let currentProductivityView = 'today';
 // ==========================================
 // SERVICE WORKER & PWA INITIALIZATION
 // ==========================================
@@ -1893,7 +1922,14 @@ function addChatMessage(content, sender) {
   
   const avatar = document.createElement('div');
   avatar.className = 'chat-avatar';
-  avatar.innerHTML = sender === 'user' ? '<i class="ph ph-user"></i>' : '<i class="ph ph-robot"></i>';
+  if (sender === 'user') {
+      avatar.innerHTML = '<i class="ph ph-user"></i>';
+  } else {
+      avatar.innerHTML = `<svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" version="1.1" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" style="width: 24px; height: 24px;">
+          <rect height="7.5" width="12.5" y="5.75" x="1.75"></rect>
+          <path d="m10.75 8.75v1.5m-5.5-1.5v1.5m-.5-7.5 3.25 3 3.25-3"></path>
+      </svg>`;
+  }
   
   const contentDiv = document.createElement('div');
   contentDiv.className = 'chat-content';
@@ -1911,7 +1947,12 @@ function addTypingIndicator() {
   const typingDiv = document.createElement('div');
   typingDiv.className = 'chat-message';
   typingDiv.innerHTML = `
-    <div class="chat-avatar"><i class="ph ph-robot"></i></div>
+    <div class="chat-avatar">
+        <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" version="1.1" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" style="width: 24px; height: 24px;">
+            <rect height="7.5" width="12.5" y="5.75" x="1.75"></rect>
+            <path d="m10.75 8.75v1.5m-5.5-1.5v1.5m-.5-7.5 3.25 3 3.25-3"></path>
+        </svg>
+    </div>
     <div class="chat-content"><span style="opacity: 0.6;">Thinking...</span></div>
   `;
   
