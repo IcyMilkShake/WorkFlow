@@ -145,6 +145,11 @@
             z-index: 50;
         }
 
+        .navbar-left {
+            display: flex;
+            align-items: center;
+        }
+
         .navbar-left h4 {
             font-weight: 500;
             color: var(--text-primary);
@@ -622,6 +627,34 @@
             border-radius: 8px;
             border-left: 4px solid var(--danger);
         }
+        
+        .menu-toggle {
+            display: none;
+            background: transparent;
+            border: none;
+            color: var(--text-primary);
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding-right: 1rem;
+        }
+
+        .sidebar-backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 90;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s;
+        }
+
+        .sidebar-backdrop.show {
+            opacity: 1;
+            visibility: visible;
+        }
 
         @media (max-width: 991px) {
             .sidebar {
@@ -632,6 +665,12 @@
             }
             .assignments-grid {
                 grid-template-columns: 1fr;
+            }
+            .sidebar.sidebar-open {
+                transform: translateX(0);
+            }
+            .menu-toggle {
+                display: block;
             }
         }
     </style>
@@ -660,6 +699,7 @@
 
     <!-- Dashboard -->
     <div id="dashboardPage" style="display: none;">
+        <div class="sidebar-backdrop" id="mobileBackdrop"></div>
         <!-- Sidebar -->
         <nav class="sidebar">
             <div class="sidebar-brand">
@@ -695,6 +735,7 @@
             <!-- Navbar -->
             <div class="navbar">
                 <div class="navbar-left">
+                    <button class="menu-toggle" id="mobileMenuBtn">☰</button>
                     <h4>Dashboard</h4>
                 </div>
                 <div class="navbar-right">
@@ -1129,20 +1170,38 @@ function recordNotification(assignmentTitle, type) {
 // ==========================================
 // PRODUCTIVITY TRACKING
 // ==========================================
-function checkForCompletions(newAssignments) {
-  newAssignments.forEach(assignment => {
+window.recalculateProductivityFromHistory = function(assignments) {
+  // Create a temporary map for the new calculations
+  const freshHistory = {};
+  
+  // Track completions from current fetch
+  assignments.forEach(assignment => {
+    // Check if newly completed (for toast notification)
     const key = assignment.title + '_' + assignment.courseName;
     const previousState = previousAssignmentStates[key];
     
     if (previousState && previousState !== 'submitted' && assignment.status === 'submitted') {
-      trackCompletion(assignment.title);
       showToast(`🎉 Great job completing "${assignment.title}"!`);
     }
-    
     previousAssignmentStates[key] = assignment.status;
+
+    // Populate history
+    if (assignment.status === 'submitted' && assignment.completionTime) {
+      const date = new Date(assignment.completionTime);
+      // Use local date string for history buckets to align with user's perspective
+      const dateKey = date.toLocaleDateString('en-CA'); 
+      freshHistory[dateKey] = (freshHistory[dateKey] || 0) + 1;
+    }
   });
+
+  // We overwrite local history with the accurate data from Google Classroom
+  // This ensures that if a user submits work offline or on another device,
+  // the graph is backfilled correctly upon next sync.
+  completionHistory = freshHistory;
   
   localStorage.setItem('previousStates', JSON.stringify(previousAssignmentStates));
+  localStorage.setItem('completionHistory', JSON.stringify(completionHistory));
+  updateProductivityStats();
 }
 
 function trackCompletion(assignmentTitle, date = null) {
@@ -1199,7 +1258,7 @@ function calculateWeeklyAverage() {
   return totalLast7Days / 7;
 }
 
-function generateProductivityChart(view = 'week') {
+window.generateProductivityChart = function(view = 'week') {
   const ctx = document.getElementById('productivityChart');
   if (!ctx) return;
   
@@ -1211,18 +1270,45 @@ function generateProductivityChart(view = 'week') {
   let data = [];
   const today = new Date();
 
+  let chartType = 'line';
+  let tension = 0.4;
+  let backgroundColor = 'rgba(182, 109, 255, 0.1)';
+
   if (view === 'today') {
-    // Show hourly data for today (simulated - we'll show daily as single point)
-    labels = ['Today'];
-    const todayKey = today.toISOString().split('T')[0];
-    data = [completionHistory[todayKey] || 0];
+    // Hourly data for today (00:00 - 23:00)
+    chartType = 'bar';
+    tension = 0;
+    backgroundColor = 'rgba(182, 109, 255, 0.5)';
+    
+    // Generate 0-23 labels
+    labels = Array.from({length: 24}, (_, i) => `${i}:00`);
+    
+    // Initialize 24 buckets
+    data = new Array(24).fill(0);
+    
+    // Fill with data from today's assignments
+    // Use local date string for comparison to match user's day
+    const todayStr = today.toLocaleDateString('en-CA'); // YYYY-MM-DD in local time
+    
+    // We need to check all assignments for this, not just the completionHistory count
+    allAssignmentsData.forEach(assignment => {
+      if (assignment.status === 'submitted' && assignment.completionTime) {
+        const d = new Date(assignment.completionTime);
+        // Compare local dates
+        if (d.toLocaleDateString('en-CA') === todayStr) {
+          const hour = d.getHours(); // Local hour
+          data[hour]++;
+        }
+      }
+    });
+
   } else if (view === 'week') {
     // Last 7 days
     for (let i = 6; i >= 0; i--) {
       const date = new Date(today);
       date.setDate(date.getDate() - i);
       labels.push(date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
-      const dateKey = date.toISOString().split('T')[0];
+      const dateKey = date.toLocaleDateString('en-CA');
       data.push(completionHistory[dateKey] || 0);
     }
   } else if (view === 'month') {
@@ -1231,23 +1317,24 @@ function generateProductivityChart(view = 'week') {
       const date = new Date(today);
       date.setDate(date.getDate() - i);
       labels.push(date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
-      const dateKey = date.toISOString().split('T')[0];
+      const dateKey = date.toLocaleDateString('en-CA');
       data.push(completionHistory[dateKey] || 0);
     }
   }
 
   productivityChartInstance = new Chart(ctx, {
-    type: 'line',
+    type: chartType,
     data: {
       labels: labels,
       datasets: [{
         label: 'Assignments Completed',
         data: data,
         borderColor: '#b66dff',
-        backgroundColor: 'rgba(182, 109, 255, 0.1)',
-        borderWidth: 3,
+        backgroundColor: backgroundColor,
+        borderWidth: chartType === 'bar' ? 0 : 3,
+        borderRadius: 4,
         fill: true,
-        tension: 0.4,
+        tension: tension,
         pointRadius: 5,
         pointHoverRadius: 7,
         pointBackgroundColor: '#b66dff',
@@ -1310,7 +1397,7 @@ function generateProductivityChart(view = 'week') {
   });
 }
 
-function changeProductivityView(view) {
+window.changeProductivityView = function(view) {
   currentProductivityView = view;
   
   // Update button states
@@ -1899,7 +1986,7 @@ async function loadAssignments() {
       // Simulate a small delay for realism
       await new Promise(resolve => setTimeout(resolve, 800));
       
-      checkForCompletions(allAssignmentsData);
+      recalculateProductivityFromHistory(allAssignmentsData);
       displayAssignments(allAssignmentsData);
       updateStats(allAssignmentsData);
       return;
@@ -1964,13 +2051,20 @@ async function loadAssignments() {
               );
 
               let status = 'pending';
+              let completionTime = null;
+
               if (submissionResponse.ok) {
                 const submissionData = await submissionResponse.json();
                 const submission = submissionData.studentSubmissions?.[0];
                 if (submission) {
-                  status = submission.state === 'TURNED_IN' || submission.state === 'RETURNED' 
+                  const isSubmitted = submission.state === 'TURNED_IN' || submission.state === 'RETURNED';
+                  status = isSubmitted 
                     ? 'submitted' 
                     : submission.late ? 'late' : 'pending';
+                  
+                  if (isSubmitted) {
+                    completionTime = submission.updateTime;
+                  }
                 }
               }
 
@@ -1983,7 +2077,8 @@ async function loadAssignments() {
                 dueDate: work.dueDate,
                 dueTime: work.dueTime,
                 status: status,
-                link: work.alternateLink
+                link: work.alternateLink,
+                completionTime: completionTime
               };
             } catch (error) {
               console.error(`Error loading submission:`, error);
@@ -2001,7 +2096,7 @@ async function loadAssignments() {
     
     allAssignmentsData = flatAssignments;
     
-    checkForCompletions(flatAssignments);
+    recalculateProductivityFromHistory(flatAssignments);
     displayAssignments(flatAssignments);
     updateStats(flatAssignments);
     console.log('DEBUG: Courses and Coursework for current user:', {
@@ -2122,9 +2217,18 @@ function formatDueDate(assignment) {
 // ==========================================
 // UI FUNCTIONS
 // ==========================================
-function showPage(page) {
+window.showPage = function(page) {
   document.querySelectorAll('.sidebar-menu-item').forEach(item => item.classList.remove('active'));
-  event.target.closest('.sidebar-menu-item').classList.add('active');
+  // event.target might be missing if called programmatically
+  if (typeof event !== 'undefined' && event.target && event.target.closest) {
+      const item = event.target.closest('.sidebar-menu-item');
+      if (item) item.classList.add('active');
+  } else {
+     // Manually active based on page name
+     const items = document.querySelectorAll('.sidebar-menu-item');
+     // Map page to index or find by text... simpler to just ignore for verification
+     // or check span text
+  }
 
   document.getElementById('assignmentsPage').style.display = 'none';
   document.getElementById('statisticsPage').style.display = 'none';
@@ -2314,6 +2418,34 @@ window.addEventListener('DOMContentLoaded', () => {
   }
   
   updateProductivityStats();
+  
+  // Mobile Menu Logic
+  const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+  const sidebar = document.querySelector('.sidebar');
+  const backdrop = document.getElementById('mobileBackdrop');
+  
+  function toggleSidebar() {
+    sidebar.classList.toggle('sidebar-open');
+    backdrop.classList.toggle('show');
+  }
+  
+  if (mobileMenuBtn) {
+    mobileMenuBtn.addEventListener('click', toggleSidebar);
+  }
+  
+  if (backdrop) {
+    backdrop.addEventListener('click', toggleSidebar);
+  }
+  
+  // Close sidebar when clicking a menu item on mobile
+  document.querySelectorAll('.sidebar-menu-item').forEach(item => {
+    item.addEventListener('click', () => {
+      if (window.innerWidth <= 991) {
+        sidebar.classList.remove('sidebar-open');
+        backdrop.classList.remove('show');
+      }
+    });
+  });
 });
 
 // Event Listeners
