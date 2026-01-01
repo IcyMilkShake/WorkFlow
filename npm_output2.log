@@ -1,0 +1,13 @@
+
+> start
+> node server.js
+
+[dotenv@17.2.3] injecting env (0) from .env -- tip: ⚙️  specify custom .env file path with { path: '/custom/path/.env' }
+undefined
+🚀 Server running on port 8080
+📱 PWA ready for installation
+
+✅ Features enabled:
+  - Offline support
+  - Auto-updates
+  - Install prompts
