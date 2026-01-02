@@ -1210,23 +1210,26 @@ if ('serviceWorker' in navigator) {
 // NOTIFICATION SYSTEM
 // ==========================================
 const COMEDIC_MESSAGES = {
-  dueSoon: [
-    "⏰ Hey procrastinator! '{title}' is due in {days} day(s). Time to panic? 🙃",
-    "🚨 Assignment alert! '{title}' is coming up in {days} day(s). Netflix can wait!",
-    "⚡ Friendly reminder: '{title}' due in {days} day(s). Your future self will thank you!",
-    "🎯 '{title}' needs attention in {days} day(s). Let's not make it a last-minute miracle!",
-    "📚 Psst... '{title}' is due in {days} day(s). Coffee up and let's do this!",
-    "🌟 Don't forget! '{title}' is {days} day(s) away. You got this, champ!",
-    "⏳ Tick tock! '{title}' is due in {days} day(s). Time to get cracking!"
+  dueTomorrow: [
+    "⏰ Tomorrow is the day! '{title}' is due. No pressure, but... pressure! 🙃",
+    "⚡ One day left for '{title}'. Future you is begging you to start now!",
+    "🎯 Deadline incoming! '{title}' is due tomorrow. Lock in! 🔒",
+    "📚 '{title}' is due tomorrow. Time to be an academic weapon!",
+    "⏳ 24 hours (roughly) until '{title}' is due. Let's get this bread! 🍞"
   ],
-  late: [
-    "😱 Uh oh! '{title}' is now OVERDUE for {days} day(s). Time to channel your inner superhero! 🦸",
-    "🔥 DEFCON 1: '{title}' is late by {days} day(s)! But hey, better late than never, right?",
-    "⚠️ Houston, we have a problem. '{title}' crossed the deadline {days} day(s) ago. Damage control time!",
-    "💀 '{title}' has been in the danger zone for {days} day(s). Quick, before your teacher notices!",
-    "🚀 Emergency! '{title}' is {days} day(s) overdue. Activate turbo mode NOW!",
-    "⏰ Late alert! '{title}' is {days} day(s) past due. Time for superhuman speed!",
-    "🆘 '{title}' wants attention - it's been waiting {days} day(s)!"
+  overdue: [
+    "🙄 Seriously? '{title}' is overdue by {days} day(s). Do you enjoy living dangerously?",
+    "😑 '{title}' is still not done. I'm not mad, just disappointed. Okay, maybe a little mad.",
+    "💀 '{title}' is late. The deadline was a suggestion, I guess? Fix it!",
+    "😤 Hey! '{title}' is {days} day(s) late. Stop ignoring me and do your work!",
+    "📉 '{title}' is overdue. Your grade is crying right now. Go save it!"
+  ],
+  dueSoonRandom: [
+    "👋 Just a friendly check-in: '{title}' is due in {days} days.",
+    "👀 Peeking in to remind you about '{title}'. It's due in {days} days!",
+    "📅 Plan ahead! '{title}' is coming up in {days} days.",
+    "🧠 might want to start thinking about '{title}'. {days} days left!",
+    "✨ You got this! '{title}' is due in {days} days. Don't leave it for the last minute."
   ]
 };
 
@@ -1263,54 +1266,52 @@ function checkAndSendNotifications() {
     if (!assignment.dueDate) return;
     
     const dueDate = new Date(assignment.dueDate.year, assignment.dueDate.month - 1, assignment.dueDate.day);
-    const daysUntilDue = Math.ceil((dueDate - now) / (1000 * 60 * 60 * 24));
+    const diffTime = dueDate - now;
+    const daysUntilDue = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     
     if (daysUntilDue < 0 && assignment.status === 'late') {
-      sendLateNotification(assignment, Math.abs(daysUntilDue));
-    } else if (daysUntilDue >= 1 && daysUntilDue <= 3 && assignment.status === 'pending') {
-      sendDueSoonNotification(assignment, daysUntilDue);
+      sendNotification(assignment, 'overdue', Math.abs(daysUntilDue));
+    } else if (daysUntilDue === 1 && assignment.status === 'pending') {
+      sendNotification(assignment, 'dueTomorrow', daysUntilDue);
+    } else if (daysUntilDue >= 2 && daysUntilDue <= 7 && assignment.status === 'pending') {
+      // Random chance (approx 10% per check) + limit max 2
+      const count = getNotificationCount(assignment.title, 'dueSoonRandom');
+      if (count < 2 && Math.random() < 0.1) {
+        sendNotification(assignment, 'dueSoonRandom', daysUntilDue);
+      }
     }
   });
 }
 
-function sendDueSoonNotification(assignment, days) {
-  if (!shouldShowNotification(assignment.title, 'dueSoon')) return;
+function sendNotification(assignment, type, days) {
+  if (!shouldShowNotification(assignment.title, type)) return;
   
-  const messages = COMEDIC_MESSAGES.dueSoon;
+  const messages = COMEDIC_MESSAGES[type];
   const message = messages[Math.floor(Math.random() * messages.length)]
     .replace('{title}', assignment.title)
     .replace('{days}', days);
   
-  new Notification('⏰ Assignment Due Soon!', {
-    body: message,
-    icon: '/icons/icon-192x192.png',
-    tag: `due-${assignment.title}`,
-    requireInteraction: false
-  });
-  
-  recordNotification(assignment.title, 'dueSoon');
-}
+  const titles = {
+    dueTomorrow: '⏰ Due Tomorrow!',
+    overdue: '🚨 Assignment Overdue!',
+    dueSoonRandom: '📅 Assignment Reminder'
+  };
 
-function sendLateNotification(assignment, days) {
-  if (!shouldShowNotification(assignment.title, 'late')) return;
-  
-  const messages = COMEDIC_MESSAGES.late;
-  const message = messages[Math.floor(Math.random() * messages.length)]
-    .replace('{title}', assignment.title)
-    .replace('{days}', days);
-  
-  new Notification('🚨 Assignment Overdue!', {
+  new Notification(titles[type], {
     body: message,
     icon: '/icons/icon-192x192.png',
-    tag: `late-${assignment.title}`,
-    requireInteraction: true
+    tag: `${type}-${assignment.title}`,
+    requireInteraction: type === 'overdue'
   });
   
-  recordNotification(assignment.title, 'late');
+  recordNotification(assignment.title, type);
+  if (type === 'dueSoonRandom') {
+    incrementNotificationCount(assignment.title, type);
+  }
 }
 
 function shouldShowNotification(assignmentTitle, type) {
-  const key = `notif_${assignmentTitle}_${type}`;
+  const key = `notif_time_${assignmentTitle}_${type}`;
   const lastShown = localStorage.getItem(key);
   if (!lastShown) return true;
   const hoursSinceLastShown = (Date.now() - parseInt(lastShown)) / (1000 * 60 * 60);
@@ -1318,8 +1319,19 @@ function shouldShowNotification(assignmentTitle, type) {
 }
 
 function recordNotification(assignmentTitle, type) {
-  const key = `notif_${assignmentTitle}_${type}`;
+  const key = `notif_time_${assignmentTitle}_${type}`;
   localStorage.setItem(key, Date.now().toString());
+}
+
+function getNotificationCount(assignmentTitle, type) {
+  const key = `notif_count_${assignmentTitle}_${type}`;
+  return parseInt(localStorage.getItem(key) || '0');
+}
+
+function incrementNotificationCount(assignmentTitle, type) {
+  const key = `notif_count_${assignmentTitle}_${type}`;
+  const count = getNotificationCount(assignmentTitle, type);
+  localStorage.setItem(key, (count + 1).toString());
 }
 
 // ==========================================
