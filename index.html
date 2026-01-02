@@ -1156,6 +1156,28 @@
                             </label>
                         </div>
                     </div>
+
+                    <div class="card">
+                        <div class="card-title"><i class="ph ph-bell" style="margin-right: 0.5rem; color: var(--primary);"></i>Notifications</div>
+                        <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">Manage your notification preferences</p>
+
+                        <div style="display: flex; align-items: center; justify-content: space-between; padding: 1rem; background: rgba(182, 109, 255, 0.05); border-radius: 8px;">
+                            <div>
+                                <div style="font-weight: 600; margin-bottom: 0.25rem;">Enable Notifications</div>
+                                <div style="font-size: 0.875rem; color: var(--text-secondary);">Receive comedic reminders for due dates</div>
+                            </div>
+                            <label class="switch" style="position: relative; display: inline-block; width: 50px; height: 26px;">
+                                <input type="checkbox" id="notifToggle" onchange="toggleNotifications(this.checked)" style="opacity: 0; width: 0; height: 0;">
+                                <span class="slider" style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--border-color); transition: .4s; border-radius: 34px;"></span>
+                                <span class="slider-knob" style="position: absolute; content: ''; height: 18px; width: 18px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%;"></span>
+                                <style>
+                                    input:checked + .slider { background-color: var(--primary); }
+                                    input:focus + .slider { box-shadow: 0 0 1px var(--primary); }
+                                    input:checked + .slider .slider-knob { transform: translateX(24px); }
+                                </style>
+                            </label>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1258,6 +1280,7 @@ function scheduleNotificationChecks() {
 
 function checkAndSendNotifications() {
   if (Notification.permission !== 'granted') return;
+  if (localStorage.getItem('notificationsEnabled') !== 'true') return;
   
   const now = new Date();
   const filteredAssignments = allAssignmentsData.filter(a => !ignoredCourses.has(a.courseName));
@@ -2511,6 +2534,39 @@ function initializeSettings() {
   document.querySelectorAll('input[name="theme"]').forEach(radio => {
     radio.addEventListener('change', (e) => changeTheme(e.target.value));
   });
+
+  const notifToggle = document.getElementById('notifToggle');
+  if (notifToggle) {
+    notifToggle.checked = localStorage.getItem('notificationsEnabled') === 'true';
+  }
+}
+
+async function toggleNotifications(enabled) {
+  const toggle = document.getElementById('notifToggle');
+
+  if (enabled) {
+    if (Notification.permission === 'granted') {
+      localStorage.setItem('notificationsEnabled', 'true');
+      showToast('🔔 Notifications enabled');
+      scheduleNotificationChecks();
+    } else {
+      // Request permission
+      toggle.checked = false; // Reset first, let permission handler set it
+      const permission = await Notification.requestPermission();
+      if (permission === 'granted') {
+        localStorage.setItem('notificationsEnabled', 'true');
+        toggle.checked = true;
+        showToast('🎉 Notifications enabled!');
+        scheduleNotificationChecks();
+        document.getElementById('notificationPermission').style.display = 'none';
+      } else {
+        showToast('❌ Permission denied. Please enable in browser settings.');
+      }
+    }
+  } else {
+    localStorage.setItem('notificationsEnabled', 'false');
+    showToast('🔕 Notifications disabled');
+  }
 }
 
 function changeTheme(theme) {
