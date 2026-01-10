@@ -1,0 +1,23 @@
+{
+  "test_client": {
+    "subscription": {
+      "endpoint": "https://fcm.googleapis.com/fcm/send/fake",
+      "keys": {
+        "p256dh": "fake",
+        "auth": "fake"
+      }
+    },
+    "assignments": [
+      {
+        "title": "Test Assignment",
+        "dueDate": {
+          "year": 2024,
+          "month": 11,
+          "day": 20
+        },
+        "status": "pending"
+      }
+    ],
+    "lastNotified": {}
+  }
+}

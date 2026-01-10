@@ -1095,6 +1095,42 @@
                                     </ul>
                                 </div>
                             </div>
+                            <div class="accordion-item">
+                                <div class="accordion-header" onclick="toggleAccordion(this)">
+                                    <span>Notifications not working on iOS</span>
+                                    <i class="ph ph-caret-down accordion-icon"></i>
+                                </div>
+                                <div class="accordion-content">
+                                    <p style="margin-bottom: 1rem;">
+                                        On iOS (iPhone/iPad), Push Notifications are only supported if:
+                                    </p>
+                                    <ul style="padding-left: 1.5rem; display: flex; flex-direction: column; gap: 0.5rem;">
+                                        <li>
+                                            Your device is running <strong>iOS 16.4 or later</strong>.
+                                        </li>
+                                        <li>
+                                            You have added this app to your <strong>Home Screen</strong> (Share > Add to Home Screen).
+                                        </li>
+                                        <li>
+                                            Notifications do not work if you are just viewing the website in Safari without installing it.
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+                            <div class="accordion-item">
+                                <div class="accordion-header" onclick="toggleAccordion(this)">
+                                    <span>Notifications not working on Android</span>
+                                    <i class="ph ph-caret-down accordion-icon"></i>
+                                </div>
+                                <div class="accordion-content">
+                                    <p>
+                                        Some older Android devices or specific manufacturers (like Xiaomi, Huawei) have aggressive battery optimization that kills background processes.
+                                    </p>
+                                    <p style="margin-top: 0.5rem;">
+                                        Ensure "WorkFlow" is allowed to run in the background in your Battery Settings.
+                                    </p>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1231,127 +1267,104 @@ if ('serviceWorker' in navigator) {
 // ==========================================
 // NOTIFICATION SYSTEM
 // ==========================================
-const COMEDIC_MESSAGES = { 
-  dueTomorrow: [ "Tomorrow is the day! '{title}' is due. No pressure, ...maybe a little pressure.", 
-    "One day left for '{title}'. Start doing it now!", 
-    "Deadline incoming! '{title}' is due tomorrow. Lock in!", 
-    "'{title}' is due tomorrow! Time to panic... I mean, get to work!", 
-    "24 hours (roughly) until '{title}' is due. Let's get this done!" ], 
-
-  overdue: [ "🙄 Seriously? '{title}' is overdue by {days} day(s). Do you enjoy living dangerously?", 
-    "😑 '{title}' is still not done. I'm not mad, just disappointed. Okay, maybe a little mad.", 
-    "💀 '{title}' is late. Save your teacher some energy and start doing it!", 
-    "😤 Hey! '{title}' is {days} day(s) late. Stop ignoring me and do your work!", 
-    "📉 '{title}' is overdue. Your grade is crying right now. Go save it!" ], 
-
-  dueSoonRandom: [ "👋 Just a friendly check-in: '{title}' is due in {days} days.", 
-    "👀 Peeking in to remind you about '{title}'. It's due in {days} days!", 
-    "Plan ahead! '{title}' is coming up in {days} days.", 
-    "Might want to start thinking about '{title}'. {days} days left!", 
-    "✨ You got this! '{title}' is due in {days} days. Don't leave it for the last minute." 
-  ] 
-};
-
 async function requestNotificationPermission() {
   if (!('Notification' in window)) {
     showToast('❌ This browser does not support notifications');
     return;
   }
 
-  const permission = await Notification.requestPermission();
-  
-  if (permission === 'granted') {
-    document.getElementById('notificationPermission').style.display = 'none';
-    localStorage.setItem('notificationsEnabled', 'true');
-    scheduleNotificationChecks();
-    showToast('🎉 Notifications enabled! You\'ll get comedic reminders for deadlines.');
-  } else {
-    showToast('❌ Notifications permission denied');
+  try {
+    const permission = await Notification.requestPermission();
+    if (permission === 'granted') {
+      document.getElementById('notificationPermission').style.display = 'none';
+      localStorage.setItem('notificationsEnabled', 'true');
+
+      // Register Push
+      await registerPushSubscription();
+      showToast('🎉 Notifications enabled! You will get reminders for deadlines.');
+    } else {
+      showToast('❌ Notifications permission denied');
+    }
+  } catch (error) {
+    console.error('Permission error:', error);
+    showToast('❌ Error requesting permissions');
   }
 }
 
-function scheduleNotificationChecks() {
-  checkAndSendNotifications();
-  setInterval(checkAndSendNotifications, 60 * 60 * 1000);
-}
+async function registerPushSubscription() {
+  if (!('serviceWorker' in navigator)) return;
 
-function checkAndSendNotifications() {
-  if (Notification.permission !== 'granted') return;
-  if (localStorage.getItem('notificationsEnabled') !== 'true') return;
-  
-  const now = new Date();
-  const filteredAssignments = allAssignmentsData.filter(a => !ignoredCourses.has(a.courseName));
-  
-  filteredAssignments.forEach(assignment => {
-    if (!assignment.dueDate) return;
+  try {
+    const registration = await navigator.serviceWorker.ready;
     
-    const dueDate = new Date(assignment.dueDate.year, assignment.dueDate.month - 1, assignment.dueDate.day);
-    const diffTime = dueDate - now;
-    const daysUntilDue = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    // Check if already subscribed
+    let subscription = await registration.pushManager.getSubscription();
     
-    if (daysUntilDue < 0 && assignment.status === 'late') {
-      sendNotification(assignment, 'overdue', Math.abs(daysUntilDue));
-    } else if (daysUntilDue === 1 && assignment.status === 'pending') {
-      sendNotification(assignment, 'dueTomorrow', daysUntilDue);
-    } else if (daysUntilDue >= 2 && daysUntilDue <= 7 && assignment.status === 'pending') {
-      // Random chance (approx 10% per check) + limit max 2
-      const count = getNotificationCount(assignment.title, 'dueSoonRandom');
-      if (count < 2 && Math.random() < 0.1) {
-        sendNotification(assignment, 'dueSoonRandom', daysUntilDue);
-      }
+    if (!subscription) {
+      // Get Public Key from Server
+      const keyResponse = await fetch('/api/vapidPublicKey');
+      const keyData = await keyResponse.json();
+      const convertedVapidKey = urlBase64ToUint8Array(keyData.publicKey);
+
+      subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: convertedVapidKey
+      });
     }
-  });
+
+    // Send to Server
+    await syncAssignmentsWithServer(subscription);
+
+  } catch (error) {
+    console.error('Push Subscription Failed:', error);
+  }
 }
 
-function sendNotification(assignment, type, days) {
-  if (!shouldShowNotification(assignment.title, type)) return;
+async function syncAssignmentsWithServer(subscription = null) {
+  if (!subscription) {
+    const reg = await navigator.serviceWorker.ready;
+    subscription = await reg.pushManager.getSubscription();
+  }
   
-  const messages = COMEDIC_MESSAGES[type];
-  const message = messages[Math.floor(Math.random() * messages.length)]
-    .replace('{title}', assignment.title)
-    .replace('{days}', days);
-  
-  const titles = {
-    dueTomorrow: '⏰ Due Tomorrow!',
-    overdue: '🚨 Assignment Overdue!',
-    dueSoonRandom: '📅 Assignment Reminder'
+  if (!subscription) return;
+
+  // Use a stable Client ID to track this user
+  let clientId = localStorage.getItem('workflow_client_id');
+  if (!clientId) {
+    clientId = 'user_' + Math.random().toString(36).substr(2, 9);
+    localStorage.setItem('workflow_client_id', clientId);
+  }
+
+  const payload = {
+    subscription: subscription,
+    clientId: clientId,
+    assignments: allAssignmentsData.filter(a => !ignoredCourses.has(a.courseName)).map(a => ({
+      title: a.title,
+      dueDate: a.dueDate,
+      status: a.status,
+      link: a.link
+    }))
   };
 
-  new Notification(titles[type], {
-    body: message,
-    icon: '/icons/icon-192x192.png',
-    tag: `${type}-${assignment.title}`,
-    requireInteraction: type === 'overdue'
+  await fetch('/api/subscribe', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
   });
-  
-  recordNotification(assignment.title, type);
-  if (type === 'dueSoonRandom') {
-    incrementNotificationCount(assignment.title, type);
+  console.log('✅ Synced assignments with push server');
+}
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding)
+    .replace(/\-/g, '+')
+    .replace(/_/g, '/');
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
   }
-}
-
-function shouldShowNotification(assignmentTitle, type) {
-  const key = `notif_time_${assignmentTitle}_${type}`;
-  const lastShown = localStorage.getItem(key);
-  if (!lastShown) return true;
-  const hoursSinceLastShown = (Date.now() - parseInt(lastShown)) / (1000 * 60 * 60);
-  return hoursSinceLastShown >= 24;
-}
-
-function recordNotification(assignmentTitle, type) {
-  const key = `notif_time_${assignmentTitle}_${type}`;
-  localStorage.setItem(key, Date.now().toString());
-}
-
-function getNotificationCount(assignmentTitle, type) {
-  const key = `notif_count_${assignmentTitle}_${type}`;
-  return parseInt(localStorage.getItem(key) || '0');
-}
-
-function incrementNotificationCount(assignmentTitle, type) {
-  const key = `notif_count_${assignmentTitle}_${type}`;
-  const count = getNotificationCount(assignmentTitle, type);
-  localStorage.setItem(key, (count + 1).toString());
+  return outputArray;
 }
 
 // ==========================================
@@ -2298,6 +2311,12 @@ async function loadAssignments() {
     recalculateProductivityFromHistory(flatAssignments);
     displayAssignments(flatAssignments);
     updateStats(flatAssignments);
+
+    // Sync with Push Server
+    if (localStorage.getItem('notificationsEnabled') === 'true') {
+      registerPushSubscription();
+    }
+
     console.log('DEBUG: Courses and Coursework for current user:', {
   user: pfp.name,
   courses: courses.map(c => ({ id: c.id, name: c.name })),
