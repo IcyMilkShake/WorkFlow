@@ -69,6 +69,13 @@ const COMEDIC_MESSAGES = {
     "💀 '{title}' is late. Save your teacher some energy and start doing it!",
     "😤 Hey! '{title}' is {days} day(s) late. Stop ignoring me and do your work!",
     "📉 '{title}' is overdue. Your grade is crying right now. Go save it!"
+  ],
+  dueSoon: [
+    "📅 Heads up! '{title}' is due in {days} days. Easy start?",
+    "👀 '{title}' is coming up in {days} days. Don't let it sneak up on you.",
+    "🗓️ Just a reminder: '{title}' is due in {days} days. Plan ahead!",
+    "🧘 '{title}' is due in {days} days. Be zen and finish it early.",
+    "🚀 '{title}' launches in {days} days. Prepare for liftoff!"
   ]
 };
 
@@ -145,7 +152,8 @@ app.post('/api/subscribe', (req, res) => {
   subscriptions[clientId] = {
     subscription,
     assignments: assignments || [],
-    lastNotified: subscriptions[clientId]?.lastNotified || {}
+    lastNotified: subscriptions[clientId]?.lastNotified || {},
+    notificationQueue: subscriptions[clientId]?.notificationQueue || []
   };
 
   saveSubscriptions();
@@ -161,9 +169,12 @@ function checkAssignmentsAndPush() {
 
   Object.keys(subscriptions).forEach(clientId => {
     const user = subscriptions[clientId];
-    const { subscription, assignments, lastNotified } = user;
+    const { subscription, assignments, lastNotified, notificationQueue } = user;
 
     if (!subscription || !assignments) return;
+
+    // Ensure queue exists
+    if (!user.notificationQueue) user.notificationQueue = [];
 
     assignments.forEach(assignment => {
       // Parse Date
@@ -176,6 +187,7 @@ function checkAssignmentsAndPush() {
       let type = null;
       if (daysUntilDue < 0 && assignment.status === 'late') type = 'overdue';
       else if (daysUntilDue <= 1 && daysUntilDue >= 0 && assignment.status === 'pending') type = 'dueTomorrow';
+      else if (daysUntilDue > 1 && daysUntilDue <= 7 && assignment.status === 'pending') type = 'dueSoon';
 
       if (!type) return;
 
@@ -183,36 +195,77 @@ function checkAssignmentsAndPush() {
       const notifKey = `${assignment.title}_${type}`;
       const lastSent = lastNotified[notifKey] || 0;
 
-      if (Date.now() - lastSent > 24 * 60 * 60 * 1000) {
-        // Send Notification
+      // Check if already in queue
+      const alreadyQueued = user.notificationQueue.some(n => n.notifKey === notifKey);
+
+      if (Date.now() - lastSent > 24 * 60 * 60 * 1000 && !alreadyQueued) {
+        // Add to Queue instead of sending immediately
         const messages = COMEDIC_MESSAGES[type];
         const message = messages[Math.floor(Math.random() * messages.length)]
           .replace('{title}', assignment.title)
           .replace('{days}', Math.abs(daysUntilDue));
 
+        let title = '⏰ Due Soon!';
+        if (type === 'overdue') title = '🚨 Assignment Overdue!';
+        else if (type === 'dueSoon') title = '📅 Upcoming Assignment';
+
         const payload = JSON.stringify({
-          title: type === 'overdue' ? '🚨 Assignment Overdue!' : '⏰ Due Soon!',
+          title: title,
           body: message,
           url: assignment.link || '/',
           type: type
         });
 
-        webPush.sendNotification(subscription, payload)
-          .then(() => {
-            console.log(`✅ Push sent to ${clientId} for ${assignment.title}`);
-            user.lastNotified[notifKey] = Date.now();
-            saveSubscriptions();
-          })
-          .catch(err => {
-            console.error(`❌ Push failed for ${clientId}:`, err.statusCode);
-            if (err.statusCode === 410 || err.statusCode === 404) {
-              // Subscription expired
-              delete subscriptions[clientId];
-              saveSubscriptions();
-            }
-          });
+        console.log(`📥 Queuing notification for ${clientId}: ${assignment.title} (${type})`);
+
+        user.notificationQueue.push({
+          payload: payload,
+          notifKey: notifKey,
+          addedAt: Date.now()
+        });
+
+        saveSubscriptions();
       }
     });
+  });
+}
+
+function processNotificationQueues() {
+  Object.keys(subscriptions).forEach(clientId => {
+    const user = subscriptions[clientId];
+
+    // Skip if no queue or empty queue
+    if (!user.notificationQueue || user.notificationQueue.length === 0) return;
+
+    // Get the first item (FIFO)
+    const item = user.notificationQueue[0];
+
+    console.log(`📤 Processing queue for ${clientId}: Sending ${item.notifKey}`);
+
+    webPush.sendNotification(user.subscription, item.payload)
+      .then(() => {
+        console.log(`✅ Push sent to ${clientId} for ${item.notifKey}`);
+        user.lastNotified[item.notifKey] = Date.now();
+
+        // Remove from queue
+        user.notificationQueue.shift();
+        saveSubscriptions();
+      })
+      .catch(err => {
+        console.error(`❌ Push failed for ${clientId}:`, err.statusCode);
+        if (err.statusCode === 410 || err.statusCode === 404) {
+          // Subscription expired
+          delete subscriptions[clientId];
+          saveSubscriptions();
+        } else {
+           // If it's a transient error, maybe we keep it?
+           // For now, let's remove it to prevent clogging if it's a payload issue,
+           // or keep it if it's a connection issue?
+           // Let's shift it to be safe and not block others.
+           user.notificationQueue.shift();
+           saveSubscriptions();
+        }
+      });
   });
 }
 
@@ -220,6 +273,10 @@ function checkAssignmentsAndPush() {
 setInterval(checkAssignmentsAndPush, 30 * 60 * 1000);
 // Also run on startup after a delay
 setTimeout(checkAssignmentsAndPush, 5000);
+
+// Process Queue Interval
+// setInterval(processNotificationQueues, 10 * 60 * 1000); // 10 minutes (Production)
+setInterval(processNotificationQueues, 1 * 60 * 1000); // 1 minute (Testing)
 
 
 // Proxy endpoint for OpenAI Chat
