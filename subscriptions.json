@@ -10,6 +10,16 @@
     },
     "assignments": [
       {
+        "title": "Due Today: 2",
+        "dueDate": {
+          "year": 2026,
+          "month": 1,
+          "day": 10
+        },
+        "status": "pending",
+        "link": "https://classroom.google.com/c/ODM3Nzc1MjMxNjQ0/a/NzkzMTQwNDE3MjQ3/details"
+      },
+      {
         "title": "Due Today: 1",
         "dueDate": {
           "year": 2026,
@@ -99,7 +109,8 @@
       "Due Today: 1_overdue": 1768023370584,
       "UrgentCoursework_overdue": 1768023370588,
       "sssssssss_overdue": 1768023370589,
-      "ggggg_overdue": 1768023370787
+      "ggggg_overdue": 1768023370787,
+      "Due Today: 2_dueTomorrow": 1768023809454
     }
   }
 }
