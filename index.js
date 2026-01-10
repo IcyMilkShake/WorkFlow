@@ -80,14 +80,103 @@ window.requestNotificationPermission = async function() {
   if (permission === 'granted') {
     byId('notificationPermission').style.display = 'none';
     localStorage.setItem('notificationsEnabled', 'true');
-    scheduleNotificationChecks();
+
+    // Subscribe to Web Push
+    subscribeToPush();
+
     showToast('🎉 Notifications enabled! You\'ll get comedic reminders for deadlines.');
   } else {
     showToast('❌ Notifications permission denied');
   }
 }
 
+// ==========================================
+// PUSH NOTIFICATION SUBSCRIPTION
+// ==========================================
+async function subscribeToPush() {
+  if (!('serviceWorker' in navigator)) return;
+
+  try {
+    const registration = await navigator.serviceWorker.ready;
+
+    // Get VAPID Key from Server
+    const response = await fetch('/api/vapidPublicKey');
+    const { publicKey } = await response.json();
+
+    const convertedVapidKey = urlBase64ToUint8Array(publicKey);
+
+    // Subscribe user
+    const subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: convertedVapidKey
+    });
+
+    console.log('✅ Push Subscribed:', subscription);
+
+    // Send subscription + data to server
+    syncWithServer(subscription);
+
+  } catch (error) {
+    console.error('❌ Failed to subscribe to push:', error);
+  }
+}
+
+async function syncWithServer(subscription = null) {
+  try {
+    if (!subscription) {
+      const registration = await navigator.serviceWorker.ready;
+      subscription = await registration.pushManager.getSubscription();
+    }
+
+    if (!subscription) return; // User hasn't enabled push yet
+
+    // Determine refresh token (only send if we just got it)
+    // Note: We don't store refresh token in localStorage for security (usually),
+    // but here we are relying on the one-time exchange or if we decide to store it.
+    // Ideally, we send it once right after login.
+    // For now, let's assume the backend handles the persistence, and we just send assignment data updates.
+    // If we have a stored refresh token in memory (from immediate login), send it.
+
+    const payload = {
+      clientId: subscription.endpoint, // Use endpoint as unique ID
+      subscription: subscription,
+      assignments: allAssignmentsData,
+      refreshToken: window.tempRefreshToken || null
+    };
+
+    await fetch('/api/subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    // Clear temp token after sending
+    if (window.tempRefreshToken) window.tempRefreshToken = null;
+
+    console.log('✅ Synced data with server');
+
+  } catch (error) {
+    console.error('❌ Sync failed:', error);
+  }
+}
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding)
+    .replace(/\-/g, '+')
+    .replace(/_/g, '/');
+
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
+
 function scheduleNotificationChecks() {
+  // Local checks (deprecated in favor of server push, but kept for fallback)
   checkAndSendNotifications();
   setInterval(checkAndSendNotifications, 60 * 60 * 1000);
 }
@@ -752,9 +841,18 @@ function addTypingIndicator() {
 function initializeGoogleAuth() {
   if (USE_MOCK_DATA) return;
   
-  googleTokenClient = google.accounts.oauth2.initTokenClient({
+  // Note: For offline access (Refresh Token), we need to request 'code' flow,
+  // but standard initTokenClient uses 'implicit' flow.
+  // We will configure this to use 'code' flow for the initial permission grant if possible,
+  // or simply add prompt: 'consent' and access_type: 'offline' equivalent if supported by the client.
+  // Actually, initTokenClient is for implicit flow (access token only).
+  // For offline access, we need initCodeClient.
+
+  googleTokenClient = google.accounts.oauth2.initCodeClient({
     client_id: GOOGLE_CLIENT_ID,
     scope: GOOGLE_SCOPES,
+    ux_mode: 'popup',
+    select_account: true,
     callback: handleGoogleAuthResponse,
   });
 }
@@ -765,12 +863,51 @@ function handleGoogleAuthResponse(response) {
     return;
   }
   
-  googleAccessToken = response.access_token;
-  const expiryTime = Date.now() + (response.expires_in || 3600) * 1000;
-  localStorage.setItem('googleAccessToken', googleAccessToken);
-  localStorage.setItem('tokenExpiry', expiryTime.toString());
-  showDashboard();
-  loadAssignments();
+  // With initCodeClient, we receive an authorization code, not an access token directly.
+  // We must exchange this code for tokens on the backend OR use it just for the refresh token
+  // and continue using implicit flow for the frontend?
+  // Actually, if we use code flow, we get a code. We send that code to the backend.
+  // The backend swaps it for (access_token, refresh_token).
+  // The backend then returns the access_token to us (the frontend) so we can make calls too.
+  // OR we can just use the code to get the refresh token on the server, and *also* use implicit flow?
+  //
+  // Better approach for this user's simple app structure:
+  // 1. Send the code to the backend.
+  // 2. Backend exchanges it, saves the Refresh Token.
+  // 3. Backend returns the Access Token to the frontend.
+
+  const code = response.code;
+  exchangeCodeForToken(code);
+}
+
+async function exchangeCodeForToken(code) {
+  try {
+    const res = await fetch('/api/auth/google/callback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code })
+    });
+
+    if (!res.ok) throw new Error('Failed to exchange code');
+
+    const data = await res.json();
+    googleAccessToken = data.access_token;
+
+    // Store refresh token temporarily to send to /api/subscribe
+    if (data.refresh_token) {
+        window.tempRefreshToken = data.refresh_token;
+    }
+
+    const expiryTime = Date.now() + (data.expires_in || 3600) * 1000;
+
+    localStorage.setItem('googleAccessToken', googleAccessToken);
+    localStorage.setItem('tokenExpiry', expiryTime.toString());
+
+    showDashboard();
+    loadAssignments();
+  } catch (err) {
+    showError('Authentication error: ' + err.message);
+  }
 }
 
 async function loadAssignments() {
@@ -932,6 +1069,11 @@ async function loadAssignments() {
     displayAssignments(flatAssignments);
     updateStats(flatAssignments);
 
+    // Sync with Server for Push Notifications
+    if (localStorage.getItem('notificationsEnabled') === 'true') {
+        syncWithServer();
+    }
+
   } finally {
     isLoading = false;
     loadingMsg.style.display = 'none';
@@ -1040,13 +1182,17 @@ window.showPage = function(page) {
       if (item) item.classList.add('active');
   }
 
-  const pages = ['assignments', 'statistics', 'ai-assistant', 'courses', 'settings', 'help'];
-  pages.forEach(p => byId(p + 'Page').style.display = 'none');
+  // Updated 'aiAssistant' to match HTML ID 'aiAssistantPage' (no hyphen)
+  const pages = ['assignments', 'statistics', 'aiAssistant', 'courses', 'settings', 'help'];
+  pages.forEach(p => {
+      const el = byId(p + 'Page');
+      if (el) el.style.display = 'none';
+  });
 
   if (page === 'statistics') {
     byId('statisticsPage').style.display = 'block';
     generateStatistics();
-  } else if (page === 'ai-assistant') {
+  } else if (page === 'aiAssistant') {
     byId('aiAssistantPage').style.display = 'block';
     initAIAssistant();
   } else if (page === 'assignments') {
@@ -1288,7 +1434,8 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 
     if (GOOGLE_CLIENT_ID && !GOOGLE_CLIENT_ID.includes('YOUR_')) {
-      googleTokenClient.requestAccessToken();
+      // requestCode() triggers the pop-up to get the auth code
+      googleTokenClient.requestCode();
     } else {
       showError('Please configure your Google Client ID first!');
     }
