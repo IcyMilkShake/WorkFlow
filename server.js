@@ -421,14 +421,14 @@ function processNotificationQueues() {
 }
 
 // Run check every 30 minutes
-setInterval(checkAssignmentsAndPush, 10 * 60 * 1000); //Testing: 1 minute
+setInterval(checkAssignmentsAndPush, 1 * 60 * 1000); //Testing: 1 minute
 // setInterval(checkAssignmentsAndPush, 30 * 60 * 1000); // Production: 30 minutes
 // Also run on startup after a delay
 setTimeout(checkAssignmentsAndPush, 5000);
 
 // Process Queue Interval
 // setInterval(processNotificationQueues, 10 * 60 * 1000); // 10 minutes (Production)
-setInterval(processNotificationQueues, 10 * 60 * 1000); // 1 minute (Testing)
+setInterval(processNotificationQueues, 1 * 60 * 1000); // 1 minute (Testing)
 
 
 // Proxy endpoint for OpenAI Chat
