@@ -69,6 +69,13 @@ const COMEDIC_MESSAGES = {
     "💀 '{title}' is late. Save your teacher some energy and start doing it!",
     "😤 Hey! '{title}' is {days} day(s) late. Stop ignoring me and do your work!",
     "📉 '{title}' is overdue. Your grade is crying right now. Go save it!"
+  ],
+  dueSoon: [
+    "📅 Heads up! '{title}' is due in {days} days. Easy start?",
+    "👀 '{title}' is coming up in {days} days. Don't let it sneak up on you.",
+    "🗓️ Just a reminder: '{title}' is due in {days} days. Plan ahead!",
+    "🧘 '{title}' is due in {days} days. Be zen and finish it early.",
+    "🚀 '{title}' launches in {days} days. Prepare for liftoff!"
   ]
 };
 
@@ -133,19 +140,68 @@ app.get('/api/vapidPublicKey', (req, res) => {
   res.json({ publicKey: vapidKeys.publicKey });
 });
 
+// Auth Callback: Exchange Code for Tokens
+app.post('/api/auth/google/callback', async (req, res) => {
+  const { code } = req.body;
+  if (!code) return res.status(400).json({ error: 'Missing code' });
+
+  try {
+    const params = new URLSearchParams({
+      code,
+      client_id: process.env.GOOGLE_CLIENT_ID, // Ensure these are set in .env or environment
+      client_secret: process.env.GOOGLE_CLIENT_SECRET,
+      redirect_uri: req.headers.origin, // Dynamic redirect based on origin
+      grant_type: 'authorization_code'
+    });
+
+    const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: params
+    });
+
+    if (!tokenRes.ok) {
+      const errorText = await tokenRes.text();
+      console.error('Token exchange failed:', errorText);
+      return res.status(tokenRes.status).send(errorText);
+    }
+
+    const tokens = await tokenRes.json();
+    res.json(tokens);
+  } catch (err) {
+    console.error('Auth Callback Error:', err);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
 // Save Subscription & Assignments Snapshot
 app.post('/api/subscribe', (req, res) => {
-  const { subscription, assignments, clientId } = req.body;
+  const { subscription, assignments, clientId, refreshToken, userId } = req.body;
 
   if (!subscription || !clientId) {
     return res.status(400).json({ error: 'Missing subscription or clientId' });
   }
 
-  // Store/Update subscription
+  // Preserve existing data if partial update
+  const existingUser = subscriptions[clientId] || {};
+  
+  // Check for account switch
+  let lastNotified = existingUser.lastNotified || {};
+  let notificationQueue = existingUser.notificationQueue || [];
+  
+  if (userId && existingUser.userId && existingUser.userId !== userId) {
+      console.log(`🔄 Account switch detected for ${clientId}. Clearing queue.`);
+      lastNotified = {};
+      notificationQueue = [];
+  }
+
   subscriptions[clientId] = {
     subscription,
-    assignments: assignments || [],
-    lastNotified: subscriptions[clientId]?.lastNotified || {}
+    assignments: assignments || existingUser.assignments || [],
+    lastNotified: lastNotified,
+    notificationQueue: notificationQueue,
+    refreshToken: refreshToken || existingUser.refreshToken, // Only update if provided
+    userId: userId || existingUser.userId // Store User ID
   };
 
   saveSubscriptions();
@@ -153,17 +209,123 @@ app.post('/api/subscribe', (req, res) => {
 });
 
 // ==========================================
-// BACKGROUND NOTIFICATION WORKER
+// BACKGROUND SYNC & NOTIFICATION WORKER
 // ==========================================
-function checkAssignmentsAndPush() {
+
+async function refreshAccessToken(refreshToken) {
+  try {
+    const params = new URLSearchParams({
+      client_id: process.env.GOOGLE_CLIENT_ID,
+      client_secret: process.env.GOOGLE_CLIENT_SECRET,
+      refresh_token: refreshToken,
+      grant_type: 'refresh_token'
+    });
+
+    const response = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: params
+    });
+
+    if (!response.ok) return null;
+    const data = await response.json();
+    return data.access_token;
+  } catch (err) {
+    console.error('Failed to refresh token:', err);
+    return null;
+  }
+}
+
+async function fetchCourseWork(accessToken) {
+  try {
+    // 1. Get Courses
+    const coursesRes = await fetch(
+      'https://classroom.googleapis.com/v1/courses?studentId=me&courseStates=ACTIVE',
+      { headers: { 'Authorization': `Bearer ${accessToken}` } }
+    );
+    if (!coursesRes.ok) return [];
+    const coursesData = await coursesRes.json();
+    const courses = coursesData.courses || [];
+
+    const allAssignments = [];
+
+    // 2. Get Work for each course (Sequential to avoid rate limits)
+    for (const course of courses) {
+      const workRes = await fetch(
+        `https://classroom.googleapis.com/v1/courses/${course.id}/courseWork`,
+        { headers: { 'Authorization': `Bearer ${accessToken}` } }
+      );
+      if (!workRes.ok) continue;
+      const workData = await workRes.json();
+      const works = workData.courseWork || [];
+
+      // Limit check to recent assignments to save bandwidth? For now, check all.
+      for (const work of works) {
+        // Get Submission Status
+        const subRes = await fetch(
+          `https://classroom.googleapis.com/v1/courses/${course.id}/courseWork/${work.id}/studentSubmissions`,
+          { headers: { 'Authorization': `Bearer ${accessToken}` } }
+        );
+        
+        let status = 'pending';
+        let completionTime = null;
+
+        if (subRes.ok) {
+          const subData = await subRes.json();
+          const submission = subData.studentSubmissions?.[0];
+          if (submission) {
+            const isSubmitted = submission.state === 'TURNED_IN' || submission.state === 'RETURNED';
+            status = isSubmitted ? 'submitted' : submission.late ? 'late' : 'pending';
+             if (isSubmitted) completionTime = submission.updateTime;
+          }
+        }
+
+        allAssignments.push({
+          title: work.title,
+          courseName: course.name,
+          dueDate: work.dueDate, // { year, month, day }
+          status: status,
+          link: work.alternateLink,
+          completionTime: completionTime
+        });
+      }
+    }
+    return allAssignments;
+  } catch (err) {
+    console.error('Error fetching course work:', err);
+    return [];
+  }
+}
+
+async function checkAssignmentsAndPush() {
   console.log('🔍 Checking assignments for push notifications...');
   const now = new Date();
 
-  Object.keys(subscriptions).forEach(clientId => {
+  // Iterate async to handle network calls
+  for (const clientId of Object.keys(subscriptions)) {
     const user = subscriptions[clientId];
-    const { subscription, assignments, lastNotified } = user;
+    
+    // 1. Try Background Sync if Token Exists
+    if (user.refreshToken && process.env.GOOGLE_CLIENT_ID) {
+        console.log(`🔄 Syncing data for ${clientId}...`);
+        const accessToken = await refreshAccessToken(user.refreshToken);
+        if (accessToken) {
+            const freshAssignments = await fetchCourseWork(accessToken);
+            if (freshAssignments.length > 0) {
+                user.assignments = freshAssignments; // Update store
+                console.log(`✅ Synced ${freshAssignments.length} assignments for ${clientId}`);
+            }
+        } else {
+            console.log(`⚠️ Could not refresh token for ${clientId}`);
+        }
+    }
 
-    if (!subscription || !assignments) return;
+    const { subscription, assignments, lastNotified, notificationQueue } = user;
+
+    if (!subscription || !assignments) continue;
+
+    // Ensure queue exists
+    if (!user.notificationQueue) user.notificationQueue = [];
 
     assignments.forEach(assignment => {
       // Parse Date
@@ -176,50 +338,97 @@ function checkAssignmentsAndPush() {
       let type = null;
       if (daysUntilDue < 0 && assignment.status === 'late') type = 'overdue';
       else if (daysUntilDue <= 1 && daysUntilDue >= 0 && assignment.status === 'pending') type = 'dueTomorrow';
+      else if (daysUntilDue > 1 && daysUntilDue <= 7 && assignment.status === 'pending') type = 'dueSoon';
 
       if (!type) return;
 
       // Check cooldown (24 hours)
       const notifKey = `${assignment.title}_${type}`;
       const lastSent = lastNotified[notifKey] || 0;
+      
+      // Check if already in queue
+      const alreadyQueued = user.notificationQueue.some(n => n.notifKey === notifKey);
 
-      if (Date.now() - lastSent > 24 * 60 * 60 * 1000) {
-        // Send Notification
+      if (Date.now() - lastSent > 24 * 60 * 60 * 1000 && !alreadyQueued) {
+        // Add to Queue instead of sending immediately
         const messages = COMEDIC_MESSAGES[type];
         const message = messages[Math.floor(Math.random() * messages.length)]
           .replace('{title}', assignment.title)
           .replace('{days}', Math.abs(daysUntilDue));
 
+        let title = '⏰ Due Soon!';
+        if (type === 'overdue') title = '🚨 Assignment Overdue!';
+        else if (type === 'dueSoon') title = '📅 Upcoming Assignment';
+
         const payload = JSON.stringify({
-          title: type === 'overdue' ? '🚨 Assignment Overdue!' : '⏰ Due Soon!',
+          title: title,
           body: message,
           url: assignment.link || '/',
           type: type
         });
 
-        webPush.sendNotification(subscription, payload)
-          .then(() => {
-            console.log(`✅ Push sent to ${clientId} for ${assignment.title}`);
-            user.lastNotified[notifKey] = Date.now();
-            saveSubscriptions();
-          })
-          .catch(err => {
-            console.error(`❌ Push failed for ${clientId}:`, err.statusCode);
-            if (err.statusCode === 410 || err.statusCode === 404) {
-              // Subscription expired
-              delete subscriptions[clientId];
-              saveSubscriptions();
-            }
-          });
+        console.log(`📥 Queuing notification for ${clientId}: ${assignment.title} (${type})`);
+        
+        user.notificationQueue.push({
+          payload: payload,
+          notifKey: notifKey,
+          addedAt: Date.now()
+        });
+        
+        saveSubscriptions();
       }
     });
+  };
+}
+
+function processNotificationQueues() {
+  Object.keys(subscriptions).forEach(clientId => {
+    const user = subscriptions[clientId];
+    
+    // Skip if no queue or empty queue
+    if (!user.notificationQueue || user.notificationQueue.length === 0) return;
+
+    // Get the first item (FIFO)
+    const item = user.notificationQueue[0];
+    
+    console.log(`📤 Processing queue for ${clientId}: Sending ${item.notifKey}`);
+
+    webPush.sendNotification(user.subscription, item.payload)
+      .then(() => {
+        console.log(`✅ Push sent to ${clientId} for ${item.notifKey}`);
+        user.lastNotified[item.notifKey] = Date.now();
+        
+        // Remove from queue
+        user.notificationQueue.shift();
+        saveSubscriptions();
+      })
+      .catch(err => {
+        console.error(`❌ Push failed for ${clientId}:`, err.statusCode);
+        if (err.statusCode === 410 || err.statusCode === 404) {
+          // Subscription expired
+          delete subscriptions[clientId];
+          saveSubscriptions();
+        } else {
+           // If it's a transient error, maybe we keep it? 
+           // For now, let's remove it to prevent clogging if it's a payload issue, 
+           // or keep it if it's a connection issue? 
+           // Let's shift it to be safe and not block others.
+           user.notificationQueue.shift();
+           saveSubscriptions();
+        }
+      });
   });
 }
 
 // Run check every 30 minutes
-setInterval(checkAssignmentsAndPush, 30 * 60 * 1000);
+setInterval(checkAssignmentsAndPush, 1 * 6 * 1000); //Testing: 1 minute
+// setInterval(checkAssignmentsAndPush, 30 * 60 * 1000); // Production: 30 minutes
 // Also run on startup after a delay
 setTimeout(checkAssignmentsAndPush, 5000);
+
+// Process Queue Interval
+// setInterval(processNotificationQueues, 10 * 60 * 1000); // 10 minutes (Production)
+setInterval(processNotificationQueues, 1 * 6 * 1000); // 1 minute (Testing)
 
 
 // Proxy endpoint for OpenAI Chat
