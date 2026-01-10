@@ -477,15 +477,15 @@ function generateStatistics() {
 }
 
 function generateStatusChart(assignments) {
-  const ctx = byId('statusChart');
-  if (!ctx) return;
-  if (statusChartInstance) statusChartInstance.destroy();
+  const container = byId('statusChartCard');
+  if (!container) return;
 
   const pending = assignments.filter(a => a.status === 'pending').length;
   const late = assignments.filter(a => a.status === 'late').length;
 
+  // Handle Empty State
   if (pending === 0 && late === 0) {
-    ctx.parentElement.innerHTML = `
+    container.innerHTML = `
       <div class="card-title">Assignment Status Distribution</div>
       <div class="empty-state">
         <div class="empty-state-icon"><i class="ph ph-confetti"></i></div>
@@ -494,6 +494,17 @@ function generateStatusChart(assignments) {
       </div>`;
     return;
   }
+
+  // Restore Canvas if missing (recovering from empty state)
+  let ctx = byId('statusChart');
+  if (!ctx) {
+    container.innerHTML = `
+      <div class="card-title">Assignment Status Distribution</div>
+      <canvas id="statusChart" style="max-height: 300px;"></canvas>`;
+    ctx = byId('statusChart');
+  }
+
+  if (statusChartInstance) statusChartInstance.destroy();
 
   statusChartInstance = new Chart(ctx, {
     type: 'doughnut',
@@ -528,9 +539,8 @@ function generateStatusChart(assignments) {
 }
 
 function generateCourseChart(assignments) {
-  const ctx = byId('courseChart');
-  if (!ctx) return;
-  if (courseChartInstance) courseChartInstance.destroy();
+  const container = byId('courseChartCard');
+  if (!container) return;
 
   const pendingAssignments = assignments.filter(a => a.status !== 'submitted');
   const courseCounts = {};
@@ -539,8 +549,9 @@ function generateCourseChart(assignments) {
   const courses = Object.keys(courseCounts);
   const counts = Object.values(courseCounts);
 
+  // Handle Empty State
   if (courses.length === 0) {
-    ctx.parentElement.innerHTML = `
+    container.innerHTML = `
       <div class="card-title">Assignments by Course</div>
       <div class="empty-state">
         <div class="empty-state-icon"><i class="ph ph-confetti"></i></div>
@@ -549,6 +560,17 @@ function generateCourseChart(assignments) {
       </div>`;
     return;
   }
+
+  // Restore Canvas if missing
+  let ctx = byId('courseChart');
+  if (!ctx) {
+    container.innerHTML = `
+      <div class="card-title">Assignments by Course</div>
+      <canvas id="courseChart" style="max-height: 300px;"></canvas>`;
+    ctx = byId('courseChart');
+  }
+
+  if (courseChartInstance) courseChartInstance.destroy();
 
   courseChartInstance = new Chart(ctx, {
     type: 'bar',
