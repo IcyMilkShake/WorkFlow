@@ -1182,13 +1182,17 @@ window.showPage = function(page) {
       if (item) item.classList.add('active');
   }
 
-  const pages = ['assignments', 'statistics', 'ai-assistant', 'courses', 'settings', 'help'];
-  pages.forEach(p => byId(p + 'Page').style.display = 'none');
+  // Updated 'aiAssistant' to match HTML ID 'aiAssistantPage' (no hyphen)
+  const pages = ['assignments', 'statistics', 'aiAssistant', 'courses', 'settings', 'help'];
+  pages.forEach(p => {
+      const el = byId(p + 'Page');
+      if (el) el.style.display = 'none';
+  });
 
   if (page === 'statistics') {
     byId('statisticsPage').style.display = 'block';
     generateStatistics();
-  } else if (page === 'ai-assistant') {
+  } else if (page === 'aiAssistant') {
     byId('aiAssistantPage').style.display = 'block';
     initAIAssistant();
   } else if (page === 'assignments') {
