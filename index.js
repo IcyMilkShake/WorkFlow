@@ -14,6 +14,7 @@ const qsa = (selector) => document.querySelectorAll(selector);
 // ==========================================
 let googleTokenClient;
 let googleAccessToken = localStorage.getItem('googleAccessToken') || null;
+let googleUserId = null; // Store user ID to detect account switches
 let tokenExpiry = localStorage.getItem('tokenExpiry') || null;
 let allAssignmentsData = [];
 let allCoursesData = [];
@@ -1002,6 +1003,7 @@ async function loadAssignments() {
 
     if (userinfo.ok) {
       const pfp = await userinfo.json();
+      googleUserId = pfp.sub; // Capture User ID
       const avatarDiv = qs('.user-avatar');
       if (pfp.picture) avatarDiv.style.backgroundImage = `url(${pfp.picture})`;
       if (pfp.name) qs('.user-name').textContent = pfp.name;

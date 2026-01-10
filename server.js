@@ -176,7 +176,7 @@ app.post('/api/auth/google/callback', async (req, res) => {
 
 // Save Subscription & Assignments Snapshot
 app.post('/api/subscribe', (req, res) => {
-  const { subscription, assignments, clientId, refreshToken } = req.body;
+  const { subscription, assignments, clientId, refreshToken, userId } = req.body;
 
   if (!subscription || !clientId) {
     return res.status(400).json({ error: 'Missing subscription or clientId' });
@@ -185,12 +185,23 @@ app.post('/api/subscribe', (req, res) => {
   // Preserve existing data if partial update
   const existingUser = subscriptions[clientId] || {};
 
+  // Check for account switch
+  let lastNotified = existingUser.lastNotified || {};
+  let notificationQueue = existingUser.notificationQueue || [];
+
+  if (userId && existingUser.userId && existingUser.userId !== userId) {
+      console.log(`🔄 Account switch detected for ${clientId}. Clearing queue.`);
+      lastNotified = {};
+      notificationQueue = [];
+  }
+
   subscriptions[clientId] = {
     subscription,
     assignments: assignments || existingUser.assignments || [],
-    lastNotified: existingUser.lastNotified || {},
-    notificationQueue: existingUser.notificationQueue || [],
-    refreshToken: refreshToken || existingUser.refreshToken // Only update if provided
+    lastNotified: lastNotified,
+    notificationQueue: notificationQueue,
+    refreshToken: refreshToken || existingUser.refreshToken, // Only update if provided
+    userId: userId || existingUser.userId // Store User ID
   };
 
   saveSubscriptions();
