@@ -140,20 +140,57 @@ app.get('/api/vapidPublicKey', (req, res) => {
   res.json({ publicKey: vapidKeys.publicKey });
 });
 
+// Auth Callback: Exchange Code for Tokens
+app.post('/api/auth/google/callback', async (req, res) => {
+  const { code } = req.body;
+  if (!code) return res.status(400).json({ error: 'Missing code' });
+
+  try {
+    const params = new URLSearchParams({
+      code,
+      client_id: process.env.GOOGLE_CLIENT_ID, // Ensure these are set in .env or environment
+      client_secret: process.env.GOOGLE_CLIENT_SECRET,
+      redirect_uri: req.headers.origin, // Dynamic redirect based on origin
+      grant_type: 'authorization_code'
+    });
+
+    const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: params
+    });
+
+    if (!tokenRes.ok) {
+      const errorText = await tokenRes.text();
+      console.error('Token exchange failed:', errorText);
+      return res.status(tokenRes.status).send(errorText);
+    }
+
+    const tokens = await tokenRes.json();
+    res.json(tokens);
+  } catch (err) {
+    console.error('Auth Callback Error:', err);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
 // Save Subscription & Assignments Snapshot
 app.post('/api/subscribe', (req, res) => {
-  const { subscription, assignments, clientId } = req.body;
+  const { subscription, assignments, clientId, refreshToken } = req.body;
 
   if (!subscription || !clientId) {
     return res.status(400).json({ error: 'Missing subscription or clientId' });
   }
 
-  // Store/Update subscription
+  // Preserve existing data if partial update
+  const existingUser = subscriptions[clientId] || {};
+
   subscriptions[clientId] = {
     subscription,
-    assignments: assignments || [],
-    lastNotified: subscriptions[clientId]?.lastNotified || {},
-    notificationQueue: subscriptions[clientId]?.notificationQueue || []
+    assignments: assignments || existingUser.assignments || [],
+    lastNotified: existingUser.lastNotified || {},
+    notificationQueue: existingUser.notificationQueue || [],
+    refreshToken: refreshToken || existingUser.refreshToken // Only update if provided
   };
 
   saveSubscriptions();
@@ -161,17 +198,120 @@ app.post('/api/subscribe', (req, res) => {
 });
 
 // ==========================================
-// BACKGROUND NOTIFICATION WORKER
+// BACKGROUND SYNC & NOTIFICATION WORKER
 // ==========================================
-function checkAssignmentsAndPush() {
+
+async function refreshAccessToken(refreshToken) {
+  try {
+    const params = new URLSearchParams({
+      client_id: process.env.GOOGLE_CLIENT_ID,
+      client_secret: process.env.GOOGLE_CLIENT_SECRET,
+      refresh_token: refreshToken,
+      grant_type: 'refresh_token'
+    });
+
+    const response = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: params
+    });
+
+    if (!response.ok) return null;
+    const data = await response.json();
+    return data.access_token;
+  } catch (err) {
+    console.error('Failed to refresh token:', err);
+    return null;
+  }
+}
+
+async function fetchCourseWork(accessToken) {
+  try {
+    // 1. Get Courses
+    const coursesRes = await fetch(
+      'https://classroom.googleapis.com/v1/courses?studentId=me&courseStates=ACTIVE',
+      { headers: { 'Authorization': `Bearer ${accessToken}` } }
+    );
+    if (!coursesRes.ok) return [];
+    const coursesData = await coursesRes.json();
+    const courses = coursesData.courses || [];
+
+    const allAssignments = [];
+
+    // 2. Get Work for each course (Sequential to avoid rate limits)
+    for (const course of courses) {
+      const workRes = await fetch(
+        `https://classroom.googleapis.com/v1/courses/${course.id}/courseWork`,
+        { headers: { 'Authorization': `Bearer ${accessToken}` } }
+      );
+      if (!workRes.ok) continue;
+      const workData = await workRes.json();
+      const works = workData.courseWork || [];
+
+      // Limit check to recent assignments to save bandwidth? For now, check all.
+      for (const work of works) {
+        // Get Submission Status
+        const subRes = await fetch(
+          `https://classroom.googleapis.com/v1/courses/${course.id}/courseWork/${work.id}/studentSubmissions`,
+          { headers: { 'Authorization': `Bearer ${accessToken}` } }
+        );
+
+        let status = 'pending';
+        let completionTime = null;
+
+        if (subRes.ok) {
+          const subData = await subRes.json();
+          const submission = subData.studentSubmissions?.[0];
+          if (submission) {
+            const isSubmitted = submission.state === 'TURNED_IN' || submission.state === 'RETURNED';
+            status = isSubmitted ? 'submitted' : submission.late ? 'late' : 'pending';
+             if (isSubmitted) completionTime = submission.updateTime;
+          }
+        }
+
+        allAssignments.push({
+          title: work.title,
+          courseName: course.name,
+          dueDate: work.dueDate, // { year, month, day }
+          status: status,
+          link: work.alternateLink,
+          completionTime: completionTime
+        });
+      }
+    }
+    return allAssignments;
+  } catch (err) {
+    console.error('Error fetching course work:', err);
+    return [];
+  }
+}
+
+async function checkAssignmentsAndPush() {
   console.log('🔍 Checking assignments for push notifications...');
   const now = new Date();
 
-  Object.keys(subscriptions).forEach(clientId => {
+  // Iterate async to handle network calls
+  for (const clientId of Object.keys(subscriptions)) {
     const user = subscriptions[clientId];
+
+    // 1. Try Background Sync if Token Exists
+    if (user.refreshToken && process.env.GOOGLE_CLIENT_ID) {
+        console.log(`🔄 Syncing data for ${clientId}...`);
+        const accessToken = await refreshAccessToken(user.refreshToken);
+        if (accessToken) {
+            const freshAssignments = await fetchCourseWork(accessToken);
+            if (freshAssignments.length > 0) {
+                user.assignments = freshAssignments; // Update store
+                console.log(`✅ Synced ${freshAssignments.length} assignments for ${clientId}`);
+            }
+        } else {
+            console.log(`⚠️ Could not refresh token for ${clientId}`);
+        }
+    }
+
     const { subscription, assignments, lastNotified, notificationQueue } = user;
 
-    if (!subscription || !assignments) return;
+    if (!subscription || !assignments) continue;
 
     // Ensure queue exists
     if (!user.notificationQueue) user.notificationQueue = [];
