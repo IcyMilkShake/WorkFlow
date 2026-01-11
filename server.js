@@ -176,7 +176,7 @@ app.post('/api/auth/google/callback', async (req, res) => {
 
 // Save Subscription & Assignments Snapshot
 app.post('/api/subscribe', (req, res) => {
-  const { subscription, assignments, clientId, refreshToken, userId } = req.body;
+  const { subscription, assignments, clientId, refreshToken, userId, ignoredCourses } = req.body;
 
   if (!subscription || !clientId) {
     return res.status(400).json({ error: 'Missing subscription or clientId' });
@@ -201,7 +201,8 @@ app.post('/api/subscribe', (req, res) => {
     lastNotified: lastNotified,
     notificationQueue: notificationQueue,
     refreshToken: refreshToken || existingUser.refreshToken, // Only update if provided
-    userId: userId || existingUser.userId // Store User ID
+    userId: userId || existingUser.userId, // Store User ID
+    ignoredCourses: ignoredCourses || existingUser.ignoredCourses || []
   };
 
   saveSubscriptions();
@@ -320,14 +321,20 @@ async function checkAssignmentsAndPush() {
         }
     }
 
-    const { subscription, assignments, lastNotified, notificationQueue } = user;
+    const { subscription, assignments, lastNotified, notificationQueue, ignoredCourses } = user;
 
     if (!subscription || !assignments) continue;
 
     // Ensure queue exists
     if (!user.notificationQueue) user.notificationQueue = [];
 
+    // Convert ignoredCourses to Set for faster lookup
+    const ignoredSet = new Set(ignoredCourses || []);
+
     assignments.forEach(assignment => {
+      // Skip if course is ignored
+      if (ignoredSet.has(assignment.courseName)) return;
+
       // Parse Date
       if (!assignment.dueDate) return;
       const dueDate = new Date(assignment.dueDate.year, assignment.dueDate.month - 1, assignment.dueDate.day);

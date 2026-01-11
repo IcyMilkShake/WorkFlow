@@ -1,7 +1,7 @@
 // ==========================================
 // CONFIGURATION & UTILS
 // ==========================================
-const USE_MOCK_DATA = false;
+const USE_MOCK_DATA = true;
 const GOOGLE_CLIENT_ID = '204169741443-lrnat59d7ob8ae63srsbg2ojefn1f51h.apps.googleusercontent.com';
 const GOOGLE_SCOPES = 'https://www.googleapis.com/auth/classroom.courses.readonly https://www.googleapis.com/auth/classroom.coursework.me.readonly https://www.googleapis.com/auth/userinfo.profile';
 
@@ -143,7 +143,8 @@ async function syncWithServer(subscription = null) {
       clientId: subscription.endpoint, // Use endpoint as unique ID
       subscription: subscription,
       assignments: allAssignmentsData,
-      refreshToken: window.tempRefreshToken || null 
+      refreshToken: window.tempRefreshToken || null,
+      ignoredCourses: Array.from(ignoredCourses)
     };
 
     await fetch('/api/subscribe', {
@@ -931,6 +932,8 @@ async function exchangeCodeForToken(code) {
     loadAssignments();
   } catch (err) {
     showError('Authentication error: ' + err.message);
+    // Hide loader if auth fails so user can see error
+    byId('appLoader').classList.add('hidden');
   }
 }
 
@@ -1103,6 +1106,11 @@ async function loadAssignments() {
     isLoading = false;
     loadingMsg.style.display = 'none';
     updateAIViewIfActive();
+
+    // Hide App Loader with a slight delay for smoothness
+    setTimeout(() => {
+        byId('appLoader').classList.add('hidden');
+    }, 800);
   }
 }
 
@@ -1424,7 +1432,12 @@ window.addEventListener('DOMContentLoaded', () => {
       loadAssignments();
     } else {
       showLoginScreen();
+      // If we show login screen, we should hide loader immediately
+      byId('appLoader').classList.add('hidden');
     }
+  } else {
+      // No token, showing login screen
+      byId('appLoader').classList.add('hidden');
   }
   
   updateProductivityStats();
@@ -1468,3 +1481,394 @@ window.addEventListener('DOMContentLoaded', () => {
 
   byId('logoutBtn')?.addEventListener('click', showLoginScreen);
 });
+
+// ==========================================
+// SCHEDULE EDITOR
+// ==========================================
+let currentScheduleDate = new Date();
+let scheduledEvents = JSON.parse(localStorage.getItem('scheduledEvents') || '[]');
+let editingEventId = null;
+
+// Ensure we start on a Monday or current day
+function initScheduleEditor() {
+    renderTaskPool();
+    renderCalendar();
+
+    // Drag & Drop Setup
+    setupDragAndDrop();
+}
+
+// Navigate Weeks
+window.changeScheduleWeek = function(delta) {
+    currentScheduleDate.setDate(currentScheduleDate.getDate() + (delta * 7));
+    renderCalendar();
+}
+
+function renderTaskPool() {
+    const pool = byId('taskPoolList');
+    if(!pool) return;
+    pool.innerHTML = '';
+
+    const unscheduled = allAssignmentsData.filter(a => {
+        return a.status !== 'submitted' &&
+               !ignoredCourses.has(a.courseName) &&
+               !isAssignmentScheduled(a.title);
+    });
+
+    if (unscheduled.length === 0) {
+        pool.innerHTML = '<div style="color: var(--text-muted); font-size: 0.8rem; text-align: center;">No unscheduled tasks</div>';
+        return;
+    }
+
+    unscheduled.forEach(task => {
+        const el = document.createElement('div');
+        el.className = 'draggable-task';
+        el.draggable = true;
+        el.textContent = task.title;
+        el.dataset.title = task.title;
+        el.dataset.duration = '60'; // Default 1 hour
+
+        el.addEventListener('dragstart', handleDragStart);
+        pool.appendChild(el);
+    });
+}
+
+function isAssignmentScheduled(title) {
+    return scheduledEvents.some(e => e.title === title);
+}
+
+function renderCalendar() {
+    const grid = byId('calendarGrid');
+    const header = byId('calendarHeader');
+    if(!grid || !header) return;
+
+    // Clear previous
+    grid.innerHTML = '';
+    // Keep the time-column-header, remove day headers
+    const existingHeaders = header.querySelectorAll('.day-header');
+    existingHeaders.forEach(h => h.remove());
+
+    // Update Month Label
+    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    byId('currentWeekLabel').textContent = `${monthNames[currentScheduleDate.getMonth()]} ${currentScheduleDate.getFullYear()}`;
+
+    // Calculate Start of Week (Sunday)
+    const startOfWeek = new Date(currentScheduleDate);
+    const day = startOfWeek.getDay();
+    const diff = startOfWeek.getDate() - day; // Adjust to Sunday
+    startOfWeek.setDate(diff);
+    startOfWeek.setHours(0,0,0,0);
+
+    // Render Headers (Sun - Sat)
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    for(let i=0; i<7; i++) {
+        const d = new Date(startOfWeek);
+        d.setDate(d.getDate() + i);
+
+        const dayDiv = document.createElement('div');
+        dayDiv.className = 'day-header';
+        if(isToday(d)) dayDiv.classList.add('today');
+
+        dayDiv.innerHTML = `<div>${days[i]}</div><div>${d.getDate()}</div>`;
+        header.appendChild(dayDiv);
+    }
+
+    // Render Grid (8 AM to 10 PM -> 15 hours)
+    // 08:00 is row 1.
+    // We will use 1-hour slots.
+    const startHour = 8;
+    const endHour = 22; // 10 PM
+
+    // Render Time Labels (Left Column)
+    for(let h = startHour; h <= endHour; h++) {
+        const timeLabel = document.createElement('div');
+        timeLabel.className = 'time-slot-label';
+        timeLabel.style.gridColumn = '1';
+        timeLabel.style.gridRow = `${h - startHour + 1}`;
+        // Format time (e.g., 9 AM)
+        const ampm = h >= 12 ? 'PM' : 'AM';
+        const hour12 = h % 12 || 12;
+        timeLabel.textContent = `${hour12} ${ampm}`;
+        grid.appendChild(timeLabel);
+    }
+
+    // Render Cells
+    for(let h = startHour; h <= endHour; h++) {
+        for(let d = 0; d < 7; d++) {
+            const cell = document.createElement('div');
+            cell.className = 'calendar-cell';
+            cell.style.gridColumn = `${d + 2}`; // +2 because col 1 is time
+            cell.style.gridRow = `${h - startHour + 1}`;
+
+            // Encode time in dataset for dropping
+            const cellDate = new Date(startOfWeek);
+            cellDate.setDate(cellDate.getDate() + d);
+            cellDate.setHours(h, 0, 0, 0);
+
+            cell.dataset.time = cellDate.toISOString();
+
+            cell.addEventListener('dragover', handleDragOver);
+            cell.addEventListener('dragleave', handleDragLeave);
+            cell.addEventListener('drop', handleDrop);
+
+            grid.appendChild(cell);
+        }
+    }
+
+    // Render Events
+    scheduledEvents.forEach(event => {
+        const eventStart = new Date(event.start);
+        const eventEnd = new Date(event.end);
+
+        // Check if event falls in this week
+        if (eventStart >= startOfWeek && eventStart < new Date(startOfWeek.getTime() + 7 * 24 * 60 * 60 * 1000)) {
+            // Calculate Position
+            const dayIndex = eventStart.getDay(); // 0-6
+            const startH = eventStart.getHours();
+            const startM = eventStart.getMinutes();
+            const durationMins = (eventEnd - eventStart) / (1000 * 60);
+
+            if (startH >= startHour && startH <= endHour) {
+                const rowStart = (startH - startHour) + 1 + (startM / 60);
+                const heightRows = durationMins / 60;
+
+                const eventEl = document.createElement('div');
+                eventEl.className = 'calendar-event';
+                eventEl.textContent = event.title;
+                eventEl.style.gridColumn = `${dayIndex + 2}`;
+
+                // CSS Grid doesn't support fractional rows easily for positioning elements *on top*
+                // without subgrid or absolute positioning within a relative container.
+                // Our grid uses `grid-auto-rows: 60px`.
+                // So 1 hour = 60px.
+
+                const topOffset = ((startH - startHour) * 60) + startM;
+                const heightPx = durationMins; // 1 min = 1px roughly if 60px/hr
+
+                eventEl.style.top = `${topOffset}px`;
+                eventEl.style.height = `${heightPx}px`;
+
+                eventEl.onclick = (e) => {
+                    e.stopPropagation();
+                    openEventModal(event);
+                };
+
+                grid.appendChild(eventEl);
+            }
+        }
+    });
+}
+
+function isToday(date) {
+    const today = new Date();
+    return date.getDate() === today.getDate() &&
+           date.getMonth() === today.getMonth() &&
+           date.getFullYear() === today.getFullYear();
+}
+
+// Drag & Drop Handlers
+let draggedTitle = null;
+
+function handleDragStart(e) {
+    draggedTitle = e.target.dataset.title;
+    e.dataTransfer.setData('text/plain', draggedTitle);
+    e.dataTransfer.effectAllowed = 'copy';
+}
+
+function handleDragOver(e) {
+    e.preventDefault();
+    e.target.classList.add('drag-over');
+}
+
+function handleDragLeave(e) {
+    e.target.classList.remove('drag-over');
+}
+
+function handleDrop(e) {
+    e.preventDefault();
+    e.target.classList.remove('drag-over');
+
+    const startTimeStr = e.target.dataset.time;
+    if (!startTimeStr || !draggedTitle) return;
+
+    const startDate = new Date(startTimeStr);
+    const endDate = new Date(startDate.getTime() + 60 * 60 * 1000); // Default 1 hour
+
+    const newEvent = {
+        id: Date.now().toString(),
+        title: draggedTitle,
+        start: startDate.toISOString(),
+        end: endDate.toISOString(),
+        alert: 15 // Default 15 mins
+    };
+
+    scheduledEvents.push(newEvent);
+    saveSchedule();
+    renderCalendar();
+    renderTaskPool(); // Remove from list
+}
+
+function saveSchedule() {
+    localStorage.setItem('scheduledEvents', JSON.stringify(scheduledEvents));
+}
+
+// Auto Schedule
+window.autoScheduleAssignments = function() {
+    if(!confirm("This will automatically schedule all pending assignments to their due dates at 5:00 PM. Continue?")) return;
+
+    const pending = allAssignmentsData.filter(a => {
+        return a.status !== 'submitted' &&
+               !ignoredCourses.has(a.courseName) &&
+               !isAssignmentScheduled(a.title);
+    });
+
+    let count = 0;
+    pending.forEach(task => {
+        if(task.dueDate) {
+            const d = new Date(task.dueDate.year, task.dueDate.month - 1, task.dueDate.day);
+            d.setHours(17, 0, 0, 0); // 5 PM
+
+            const end = new Date(d.getTime() + 60 * 60 * 1000); // 1 hour
+
+            scheduledEvents.push({
+                id: Date.now() + Math.random().toString(),
+                title: task.title,
+                start: d.toISOString(),
+                end: end.toISOString(),
+                alert: 60
+            });
+            count++;
+        }
+    });
+
+    if(count > 0) {
+        showToast(`Scheduled ${count} assignments!`);
+        saveSchedule();
+        renderCalendar();
+        renderTaskPool();
+    } else {
+        showToast("No suitable assignments found to schedule.");
+    }
+}
+
+// Event Modal
+window.openEventModal = function(event) {
+    editingEventId = event.id;
+    const modal = byId('eventModal');
+
+    // Convert ISO to local time input format (HH:MM)
+    const s = new Date(event.start);
+    const e = new Date(event.end);
+
+    byId('eventStartTime').value = `${pad(s.getHours())}:${pad(s.getMinutes())}`;
+    byId('eventEndTime').value = `${pad(e.getHours())}:${pad(e.getMinutes())}`;
+    byId('eventAlert').value = event.alert;
+
+    modal.style.display = 'flex';
+}
+
+window.closeEventModal = function() {
+    byId('eventModal').style.display = 'none';
+    editingEventId = null;
+}
+
+window.saveEvent = function() {
+    if(!editingEventId) return;
+
+    const eventIndex = scheduledEvents.findIndex(e => e.id === editingEventId);
+    if(eventIndex === -1) return;
+
+    const event = scheduledEvents[eventIndex];
+    const baseDate = new Date(event.start); // Keep the date, change time
+
+    const startParts = byId('eventStartTime').value.split(':');
+    const endParts = byId('eventEndTime').value.split(':');
+
+    const newStart = new Date(baseDate);
+    newStart.setHours(parseInt(startParts[0]), parseInt(startParts[1]));
+
+    const newEnd = new Date(baseDate);
+    newEnd.setHours(parseInt(endParts[0]), parseInt(endParts[1]));
+
+    // Handle overnight edge case? For now assume same day.
+    if (newEnd < newStart) newEnd.setDate(newEnd.getDate() + 1);
+
+    scheduledEvents[eventIndex] = {
+        ...event,
+        start: newStart.toISOString(),
+        end: newEnd.toISOString(),
+        alert: parseInt(byId('eventAlert').value)
+    };
+
+    saveSchedule();
+    renderCalendar();
+    closeEventModal();
+}
+
+window.deleteEvent = function() {
+    if(!editingEventId) return;
+    scheduledEvents = scheduledEvents.filter(e => e.id !== editingEventId);
+    saveSchedule();
+    renderCalendar();
+    renderTaskPool(); // Return to pool
+    closeEventModal();
+}
+
+function pad(n) { return n < 10 ? '0'+n : n; }
+
+// ICS Export
+window.exportScheduleToICS = function() {
+    if(scheduledEvents.length === 0) {
+        showToast("No events to export.");
+        return;
+    }
+
+    let icsContent = "BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//WorkFlow//Student Scheduler//EN\n";
+
+    scheduledEvents.forEach(e => {
+        const start = formatICSDate(new Date(e.start));
+        const end = formatICSDate(new Date(e.end));
+        const now = formatICSDate(new Date());
+
+        icsContent += "BEGIN:VEVENT\n";
+        icsContent += `UID:${e.id}@workflow.app\n`;
+        icsContent += `DTSTAMP:${now}\n`;
+        icsContent += `DTSTART:${start}\n`;
+        icsContent += `DTEND:${end}\n`;
+        icsContent += `SUMMARY:${e.title}\n`;
+
+        if (e.alert > 0) {
+            icsContent += "BEGIN:VALARM\n";
+            icsContent += "ACTION:DISPLAY\n";
+            icsContent += "DESCRIPTION:Reminder\n";
+            icsContent += `TRIGGER:-PT${e.alert}M\n`;
+            icsContent += "END:VALARM\n";
+        }
+
+        icsContent += "END:VEVENT\n";
+    });
+
+    icsContent += "END:VCALENDAR";
+
+    const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+    const link = document.createElement('a');
+    link.href = window.URL.createObjectURL(blob);
+    link.setAttribute('download', 'workflow_schedule.ics');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+function formatICSDate(date) {
+    return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+}
+
+// Hook into showPage to init editor
+const originalShowPage = window.showPage;
+window.showPage = function(page) {
+    originalShowPage(page);
+    if (page === 'aiAssistant') {
+        // Delay slightly to allow DOM to settle if needed, or just call
+        setTimeout(initScheduleEditor, 100);
+    }
+}
