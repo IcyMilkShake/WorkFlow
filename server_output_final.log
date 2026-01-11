@@ -1,23 +1,13 @@
-[dotenv@17.2.3] injecting env (0) from .env -- tip: ⚙️  write to custom object with { processEnv: myObject }
+[dotenv@17.2.3] injecting env (0) from .env -- tip: 🔐 prevent building .env in docker: https://dotenvx.com/prebuild
 ✅ Web Push initialized
 undefined
-🚀 Server running on port 8082
+🚀 Server running on port 8083
 📱 PWA ready for installation
 
 ✅ Features enabled:
   - Offline support
   - Auto-updates
   - Install prompts
-🔍 Checking assignments for push notifications...
-OpenAI API Error: 401 {
-    "error": {
-        "message": "Incorrect API key provided: undefined. You can find your API key at https://platform.openai.com/account/api-keys.",
-        "type": "invalid_request_error",
-        "param": null,
-        "code": "invalid_api_key"
-    }
-}
-
 🔍 Checking assignments for push notifications...
 OpenAI API Error: 401 {
     "error": {

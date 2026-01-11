@@ -768,6 +768,18 @@
     </style>
 </head>
 <body>
+    <!-- App Loader -->
+    <div id="appLoader">
+        <div class="loader-content">
+            <div class="shapes-container">
+                <div class="shape circle"></div>
+                <div class="shape triangle"></div>
+                <div class="shape square"></div>
+            </div>
+            <div class="loader-text">Loading your workflow...</div>
+        </div>
+    </div>
+
     <!-- Login Page -->
     <div class="auth-page" id="loginPage">
         <div class="auth-card">
@@ -1054,6 +1066,85 @@
                                 <textarea id="chatInput" class="chat-input" rows="2" placeholder="Ask me anything about your assignments..."></textarea>
                                 <button class="btn btn-primary" onclick="sendChatMessage()" style="padding: 1rem 1.5rem;">Send</button>
                             </div>
+                        </div>
+                    </div>
+
+                    <!-- Schedule Editor Section -->
+                    <div id="scheduleEditorSection" style="margin-top: 3rem;">
+                        <div class="page-header">
+                            <h3><i class="ph ph-calendar-plus" style="margin-right: 0.5rem; color: var(--primary);"></i>Schedule Editor</h3>
+                            <p style="color: var(--text-secondary);">Drag pending assignments to your weekly schedule.</p>
+                        </div>
+
+                        <div class="schedule-controls">
+                            <div class="schedule-nav">
+                                <button class="btn-icon" onclick="changeScheduleWeek(-1)"><i class="ph ph-caret-left"></i></button>
+                                <span id="currentWeekLabel">Nov 2024</span>
+                                <button class="btn-icon" onclick="changeScheduleWeek(1)"><i class="ph ph-caret-right"></i></button>
+                            </div>
+                            <div class="schedule-actions">
+                                <button class="btn btn-primary" onclick="autoScheduleAssignments()">
+                                    <i class="ph ph-magic-wand"></i> Auto-Schedule
+                                </button>
+                                <button class="btn btn-secondary" onclick="exportScheduleToICS()">
+                                    <i class="ph ph-download-simple"></i> Export .ICS
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="schedule-container">
+                            <!-- Left Sidebar: Task Pool -->
+                            <div class="task-pool">
+                                <h4>Unscheduled Tasks</h4>
+                                <div id="taskPoolList" class="task-list">
+                                    <!-- Draggable items will be injected here -->
+                                </div>
+                            </div>
+
+                            <!-- Main Calendar Grid -->
+                            <div class="calendar-wrapper">
+                                <div class="calendar-header" id="calendarHeader">
+                                    <div class="time-column-header"></div>
+                                    <!-- Days headers injected via JS -->
+                                </div>
+                                <div class="calendar-grid" id="calendarGrid">
+                                    <!-- Time slots injected via JS -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Edit Event Modal -->
+                <div id="eventModal" class="modal" style="display: none;">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h4>Edit Schedule</h4>
+                            <span class="close-modal" onclick="closeEventModal()">&times;</span>
+                        </div>
+                        <div class="modal-body">
+                            <div class="form-group">
+                                <label>Start Time</label>
+                                <input type="time" id="eventStartTime">
+                            </div>
+                            <div class="form-group">
+                                <label>End Time</label>
+                                <input type="time" id="eventEndTime">
+                            </div>
+                            <div class="form-group">
+                                <label>Alert Before</label>
+                                <select id="eventAlert">
+                                    <option value="0">None</option>
+                                    <option value="15">15 minutes</option>
+                                    <option value="30">30 minutes</option>
+                                    <option value="60">1 hour</option>
+                                    <option value="1440">1 day</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button class="btn btn-danger" onclick="deleteEvent()">Remove</button>
+                            <button class="btn btn-primary" onclick="saveEvent()">Save</button>
                         </div>
                     </div>
                 </div>
