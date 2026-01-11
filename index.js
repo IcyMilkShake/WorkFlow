@@ -46,36 +46,34 @@ if ('serviceWorker' in navigator) {
 // ==========================================
 // NOTIFICATIONS
 // ==========================================
-const COMEDIC_MESSAGES = { 
-  dueTomorrow: [ 
-    "Tomorrow is the day! '{title}' is due. No pressure, ...maybe a little pressure.", 
-    "One day left for '{title}'. Start doing it now!", 
-    "Deadline incoming! '{title}' is due tomorrow. Lock in!", 
-    "'{title}' is due tomorrow! Time to panic... I mean, get to work!", 
-    "24 hours (roughly) until '{title}' is due. Let's get this done!" 
-  ], 
-  overdue: [ 
-    "🙄 Seriously? '{title}' is overdue by {days} day(s). Do you enjoy living dangerously?", 
-    "😑 '{title}' is still not done. I'm not mad, just disappointed. Okay, maybe a little mad.", 
-    "💀 '{title}' is late. Save your teacher some energy and start doing it!", 
-    "😤 Hey! '{title}' is {days} day(s) late. Stop ignoring me and do your work!", 
-    "📉 '{title}' is overdue. Your grade is crying right now. Go save it!" 
-  ], 
-  dueSoonRandom: [ 
-    "👋 Just a friendly check-in: '{title}' is due in {days} days.", 
-    "👀 Peeking in to remind you about '{title}'. It's due in {days} days!", 
-    "Plan ahead! '{title}' is coming up in {days} days.", 
-    "Might want to start thinking about '{title}'. {days} days left!", 
-    "✨ You got this! '{title}' is due in {days} days. Don't leave it for the last minute." 
-  ] 
+const COMEDIC_MESSAGES = {
+  dueTomorrow: [
+    "Bad news twin 😬 '{title}' is due TOMORROW.",
+    "Tomorrow. '{title}'. That’s it. That’s the message.",
+    "'{title}' is due tomorrow. This is not a drill. Lock. In.",
+    "You have exactly one (1) day left for '{title}'. Choose wisely.",
+    "Not to ruin your vibe, but '{title}' is due tomorrow 👀"
+  ],
+
+  overdue: [
+    "So… '{title}' is {days} day(s) overdue 😭 Let’s pretend it’s fine and start now.",
+    "Yeahhh '{title}' was past due already by {days} day.",
+    "'{title}' is late. It happens. But atleast... let’s fix it.",
+    "Respectfully… '{title}' is {days} day(s) overdue.",
+    "Forgot about '{title}' and now it’s overdue 💀"
+  ],
+
+  dueSoonRandom: [
+    "Just popping in to remind you that '{title}' exists. {days} days left.",
+    "No panic yet, but '{title}' is due in {days} days.",
+    "This is your casual reminder that '{title}' is due in {days} days 👋",
+    "Future you is begging you to start '{title}'. {days} days remaining.",
+    "You’re still chilling, but '{title}' is due in {days} days. Just saying."
+  ]
 };
 
+
 window.requestNotificationPermission = async function() {
-  console.log('1. Button clicked');
-  console.log('2. Current permission:', Notification.permission);
-  console.log('3. Is standalone?', window.navigator.standalone);
-  console.log('4. User agent:', navigator.userAgent);
-  
   if (!('Notification' in window)) {
     showToast('❌ This browser does not support notifications');
     return;
@@ -90,7 +88,6 @@ window.requestNotificationPermission = async function() {
     await subscribeToPush();
     showToast('🎉 Notifications enabled!');
   } else {
-    console.log('6. Permission denied or dismissed');
     showToast(`❌ Permission result: ${permission}`);
   }
 }
