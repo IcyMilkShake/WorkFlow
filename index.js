@@ -71,23 +71,27 @@ const COMEDIC_MESSAGES = {
 };
 
 window.requestNotificationPermission = async function() {
+  console.log('1. Button clicked');
+  console.log('2. Current permission:', Notification.permission);
+  console.log('3. Is standalone?', window.navigator.standalone);
+  console.log('4. User agent:', navigator.userAgent);
+  
   if (!('Notification' in window)) {
     showToast('❌ This browser does not support notifications');
     return;
   }
 
   const permission = await Notification.requestPermission();
+  console.log('5. New permission:', permission);
   
   if (permission === 'granted') {
     byId('notificationPermission').style.display = 'none';
     localStorage.setItem('notificationsEnabled', 'true');
-    
-    // Subscribe to Web Push
-    subscribeToPush();
-    
-    showToast('🎉 Notifications enabled! You\'ll get comedic reminders for deadlines.');
+    await subscribeToPush();
+    showToast('🎉 Notifications enabled!');
   } else {
-    showToast('❌ Notifications permission denied');
+    console.log('6. Permission denied or dismissed');
+    showToast(`❌ Permission result: ${permission}`);
   }
 }
 
