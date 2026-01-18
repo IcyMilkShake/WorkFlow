@@ -168,22 +168,22 @@ function renderScheduleCalendar() {
         const events = scheduleEvents[dateKey] || [];
         const isToday = new Date().toDateString() === new Date(year, month, day).toDateString();
         
-        return `
-          <div 
-            class="calendar-day" 
-            data-date="${dateKey}"
-            style="background: var(--card-bg); min-height: 120px; padding: 0.5rem; cursor: pointer; border: 2px solid ${isToday ? 'var(--primary)' : 'transparent'}; position: relative; transition: all 0.2s ease;"
-            ondrop="handleScheduleDrop(event)"
-            ondragover="handleDragOver(event)"
-            ondragleave="handleDragLeave(event)"
-          >
+      return `
+        <div 
+          class="calendar-day" 
+          data-date="${dateKey}"
+          style="background: var(--card-bg); min-height: 120px; padding: 0.5rem; cursor: pointer; border: 2px solid ${isToday ? 'var(--primary)' : 'transparent'}; position: relative; transition: background 0.2s;"
+          ondrop="handleScheduleDrop(event)"
+          ondragover="event.preventDefault(); event.currentTarget.style.background = 'rgba(182, 109, 255, 0.1)';"
+          ondragleave="event.currentTarget.style.background = 'var(--card-bg)';"
+        >
             <div style="font-weight: 600; margin-bottom: 0.5rem; color: ${isToday ? 'var(--primary)' : 'var(--text-primary)'};">${day}</div>
             <div class="schedule-events">
               ${events.map(event => `
                 <div 
                   class="schedule-event" 
                   onclick="editScheduleEvent('${dateKey}', '${event.id}')"
-                  style="background: rgba(182, 109, 255, 0.2); border-left: 3px solid var(--primary); padding: 0.25rem 0.5rem; margin-bottom: 0.25rem; border-radius: 4px; font-size: 0.75rem; cursor: pointer; position: relative; transition: all 0.2s;"
+                  style="background: rgba(182, 109, 255, 0.2); border-left: 3px solid var(--primary); padding: 0.25rem 0.5rem; margin-bottom: 0.25rem; border-radius: 4px; font-size: 0.75rem; cursor: pointer; position: relative;"
                   title="${event.title}"
                 >
                   <div style="font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${event.title}</div>
@@ -302,7 +302,7 @@ function handleDragEnd(e) {
   }
   
   document.querySelectorAll('.calendar-day').forEach(day => {
-    day.style.background = '';
+    day.style.background = 'var(--card-bg)';
     day.style.transform = '';
   });
   
@@ -310,20 +310,10 @@ function handleDragEnd(e) {
 }
 window.handleAssignmentDragStart = function(event, assignment) {
   draggedAssignment = assignment;
-  
-  // Create a clone that follows cursor
-  const clone = event.currentTarget.cloneNode(true);
-  clone.style.position = 'absolute';
-  clone.style.top = '-9999px';
-  clone.style.width = event.currentTarget.offsetWidth + 'px';
-  clone.style.pointerEvents = 'none';
-  document.body.appendChild(clone);
-  
   event.dataTransfer.effectAllowed = 'move';
-  event.dataTransfer.setDragImage(clone, clone.offsetWidth / 2, 20);
   
-  // Clean up after drag starts
-  setTimeout(() => clone.remove(), 0);
+  // Use the actual element as drag image
+  event.dataTransfer.setDragImage(event.currentTarget, event.currentTarget.offsetWidth / 2, 20);
 }
 
 window.handleDragOver = function(event) {
@@ -337,13 +327,17 @@ window.handleDragOver = function(event) {
 
 window.handleDragLeave = function(event) {
   const target = event.currentTarget;
-  target.style.background = '';
+  target.style.background = 'var(--card-bg)';
   target.style.transform = '';
 }
 
 // Find and replace this function:
 window.handleScheduleDrop = function(event) {
   event.preventDefault();
+  
+  // IMPORTANT: Clear the gray background immediately
+  event.currentTarget.style.background = 'var(--card-bg)';
+  
   if (!draggedAssignment) return;
 
   const dateKey = event.currentTarget.dataset.date;
