@@ -1,5 +1,6 @@
-const CACHE_NAME = 'workflow-v2.0.1';
-const RUNTIME_CACHE = 'workflow-runtime';
+const CACHE_VERSION = '2.0.3'; // INCREMENT THIS ON EVERY DEPLOY
+const CACHE_NAME = `workflow-v${CACHE_VERSION}`;
+const RUNTIME_CACHE = `workflow-runtime-v${CACHE_VERSION}`;
 
 const PRECACHE_URLS = [
   '/',
@@ -28,58 +29,77 @@ const NOTIFICATION_MESSAGES = {
 
 // Install event
 self.addEventListener('install', (event) => {
-  console.log('Service Worker: Installing v2.0.0...');
+  console.log(`[SW] Installing version ${CACHE_VERSION}...`);
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => cache.addAll(PRECACHE_URLS))
-      .then(() => self.skipWaiting())
+      .then(() => self.skipWaiting()) // Activate immediately
   );
 });
 
-// Activate event
+
+// Activate event - clean up old caches
 self.addEventListener('activate', (event) => {
-  console.log('Service Worker: Activating...');
+  console.log(`[SW] Activating version ${CACHE_VERSION}...`);
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
+          // Delete ANY cache that doesn't match current version
           if (cacheName !== CACHE_NAME && cacheName !== RUNTIME_CACHE) {
+            console.log(`[SW] Deleting old cache: ${cacheName}`);
             return caches.delete(cacheName);
           }
         })
       );
-    }).then(() => self.clients.claim())
+    }).then(() => {
+      console.log(`[SW] Version ${CACHE_VERSION} is now active`);
+      return self.clients.claim(); // Take control immediately
+    })
   );
 });
 
-// Fetch event
+// Fetch event - Network First for HTML/JS, Cache First for assets
 self.addEventListener('fetch', (event) => {
-  if (!event.request.url.startsWith(self.location.origin)) {
-    if (event.request.url.includes('googleapis.com') || 
-        event.request.url.includes('accounts.google.com') ||
-        event.request.url.includes('openai.com')) {
+  const url = new URL(event.request.url);
+
+  // Skip external requests
+  if (!url.origin.startsWith(self.location.origin)) {
+    if (url.hostname.includes('googleapis.com') || 
+        url.hostname.includes('accounts.google.com') ||
+        url.hostname.includes('openai.com')) {
       return;
     }
   }
 
-  if (event.request.mode === 'navigate') {
+  // Network First for HTML and JavaScript (always get latest)
+  if (event.request.mode === 'navigate' || 
+      url.pathname.endsWith('.js') || 
+      url.pathname.endsWith('.html')) {
     event.respondWith(
       fetch(event.request)
         .then((response) => {
+          // Update cache with fresh version
           return caches.open(RUNTIME_CACHE).then((cache) => {
             cache.put(event.request, response.clone());
             return response;
           });
         })
-        .catch(() => caches.match('/offline.html'))
+        .catch(() => {
+          // Fallback to cache if offline
+          return caches.match(event.request)
+            .then(cached => cached || caches.match('/offline.html'));
+        })
     );
     return;
   }
 
+  // Cache First for static assets (CSS, images, fonts)
   event.respondWith(
     caches.match(event.request)
       .then((cachedResponse) => {
         if (cachedResponse) return cachedResponse;
+        
         return fetch(event.request)
           .then((response) => {
             if (event.request.method === 'GET' && response.status === 200) {
@@ -94,18 +114,32 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
-// Handle notification scheduling
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
   }
+  
+  // Manual cache clear command
+  if (event.data && event.data.type === 'CLEAR_CACHE') {
+    event.waitUntil(
+      caches.keys().then(names => {
+        return Promise.all(names.map(name => caches.delete(name)));
+      }).then(() => {
+        return self.clients.matchAll();
+      }).then(clients => {
+        clients.forEach(client => {
+          client.postMessage({ type: 'CACHE_CLEARED' });
+        });
+      })
+    );
+  }
 });
 
-// Push event (triggered by backend)
+// Push notifications
 self.addEventListener('push', (event) => {
   if (event.data) {
     const data = event.data.json();
-    console.log('Push received:', data);
+    console.log('[SW] Push received:', data);
 
     const title = data.title || 'WorkFlow Alert';
     const options = {
@@ -134,7 +168,6 @@ self.addEventListener('notificationclick', (event) => {
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true })
       .then((clientList) => {
-        // If the window is already open, focus it
         for (const client of clientList) {
           if ('focus' in client) {
             return client.focus().then(focusedClient => {
@@ -144,7 +177,6 @@ self.addEventListener('notificationclick', (event) => {
             });
           }
         }
-        // Otherwise open a new window
         if (clients.openWindow) {
           return clients.openWindow(url);
         }

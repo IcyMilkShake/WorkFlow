@@ -5,7 +5,33 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
-    
+    <script>
+        const APP_VERSION = '2.0.3'; // Increment this with each deploy
+        const cachedVersion = localStorage.getItem('appVersion');
+
+        if (cachedVersion && cachedVersion !== APP_VERSION) {
+        console.log('New version detected, clearing cache...');
+        
+        // Clear all caches
+        if ('caches' in window) {
+            caches.keys().then(names => {
+            names.forEach(name => caches.delete(name));
+            });
+        }
+        
+        // Unregister service worker
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(registrations => {
+            registrations.forEach(registration => registration.unregister());
+            });
+        }
+        
+        localStorage.setItem('appVersion', APP_VERSION);
+        window.location.reload(true);
+        }
+
+        localStorage.setItem('appVersion', APP_VERSION);
+    </script>
     <!-- PWA Meta Tags -->
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#b66dff">

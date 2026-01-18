@@ -1,4 +1,63 @@
+// ==========================================
+// SERVICE WORKER UPDATE DETECTION
+// ==========================================
+if ('serviceWorker' in navigator) {
+  let refreshing = false;
+  
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (refreshing) return;
+    refreshing = true;
+    console.log('🔄 New version detected, reloading...');
+    window.location.reload();
+  });
 
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/service-worker.js')
+      .then(registration => {
+        console.log('✅ Service Worker registered');
+        
+        // Check for updates every 60 seconds
+        setInterval(() => {
+          registration.update();
+        }, 60000);
+        
+        registration.addEventListener('updatefound', () => {
+          const newWorker = registration.installing;
+          
+          newWorker.addEventListener('statechange', () => {
+            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              // New version available
+              showUpdateNotification();
+            }
+          });
+        });
+      })
+      .catch(error => console.error('Service Worker registration failed:', error));
+  });
+}
+
+function showUpdateNotification() {
+  const updateBanner = document.createElement('div');
+  updateBanner.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(135deg, #b66dff 0%, #9946e6 100%);
+    color: white;
+    padding: 1rem;
+    text-align: center;
+    z-index: 99999;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  `;
+  updateBanner.innerHTML = `
+    <strong>🎉 New version available!</strong>
+    <button onclick="window.location.reload()" style="margin-left: 1rem; padding: 0.5rem 1rem; background: white; color: #b66dff; border: none; border-radius: 4px; font-weight: 600; cursor: pointer;">
+      Update Now
+    </button>
+  `;
+  document.body.prepend(updateBanner);
+}
 // ==========================================
 // CONFIGURATION & UTILS
 // ==========================================
@@ -53,16 +112,6 @@ let productivityChartInstance = null;
 let currentProductivityView = 'today';
 let currentScheduleDate = new Date();
 let draggedAssignment = null;
-
-// ==========================================
-// SERVICE WORKER
-// ==========================================
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/service-worker.js')
-      .catch((error) => console.error('Service Worker registration failed:', error));
-  });
-}
 
 // ==========================================
 // SCHEDULE EDITOR
@@ -1557,37 +1606,54 @@ function formatDueDate(assignment) {
 // UI FUNCTIONS
 // ==========================================
 window.showPage = function(page) {
+  // Update sidebar active state
   qsa('.sidebar-menu-item').forEach(item => item.classList.remove('active'));
   if (typeof event !== 'undefined' && event.target && event.target.closest) {
     const item = event.target.closest('.sidebar-menu-item');
     if (item) item.classList.add('active');
   }
 
+  // Hide all pages
   const pages = ['assignments', 'statistics', 'aiAssistant', 'schedule', 'courses', 'settings', 'help'];
   pages.forEach(p => {
     const el = byId(p + 'Page');
     if (el) el.style.display = 'none';
   });
-  if (page === 'statistics') {
-    byId('statisticsPage').style.display = 'block';
-    generateStatistics();
-  } else if (page === 'aiAssistant') {
-    byId('aiAssistantPage').style.display = 'block';
-    initAIAssistant();
-  } else if (page === 'schedule') {
-    byId('schedulePage').style.display = 'block';
-    renderScheduleCalendar();
-    renderUnscheduledAssignments();
-  } else if (page === 'assignments') {
-    byId('assignmentsPage').style.display = 'block';
-  } else if (page === 'courses') {
-    byId('coursesPage').style.display = 'block';
-    displayCourses();
-  } else if (page === 'settings') {
-    byId('settingsPage').style.display = 'block';
-    initializeSettings();
-  } else if (page === 'help') {
-    byId('helpPage').style.display = 'block';
+
+  // Show requested page and initialize it
+  const pageElement = byId(page + 'Page');
+  if (!pageElement) {
+    console.error(`Page element not found: ${page}Page`);
+    return;
+  }
+
+  pageElement.style.display = 'block';
+
+  // Page-specific initialization
+  switch(page) {
+    case 'statistics':
+      generateStatistics();
+      break;
+      
+    case 'aiAssistant':
+      initAIAssistant();
+      break;
+      
+    case 'schedule':
+      // Wait for DOM to be ready
+      setTimeout(() => {
+        renderScheduleCalendar();
+        renderUnscheduledAssignments();
+      }, 0);
+      break;
+      
+    case 'courses':
+      displayCourses();
+      break;
+      
+    case 'settings':
+      initializeSettings();
+      break;
   }
 }
 
