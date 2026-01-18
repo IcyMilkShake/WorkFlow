@@ -176,13 +176,14 @@ function renderUnscheduledAssignments() {
     return;
   }
 
-  // Inject button into sticky header
+  // Inject button into header
   const btnDiv = document.createElement('div');
   btnDiv.id = 'autoScheduleBtn';
   btnDiv.style.width = '100%';
+  btnDiv.style.marginTop = '1rem';
   btnDiv.innerHTML = `
-    <button class="btn btn-primary" onclick="autoScheduleAll()" style="width: 100%; padding: 0.5rem;">
-      <i class="ph ph-magic-wand"></i> Auto-Schedule All
+    <button class="btn btn-primary" onclick="autoScheduleAll()" style="width: 100%; padding: 0.75rem; border-radius: 8px; font-weight: 600; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+      <i class="ph ph-magic-wand" style="font-size: 1.1rem;"></i> Auto-Schedule All
     </button>
   `;
   header.appendChild(btnDiv);

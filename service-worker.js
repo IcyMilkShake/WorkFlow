@@ -1,4 +1,4 @@
-const CACHE_NAME = 'workflow-v2.0.0';
+const CACHE_NAME = 'workflow-v2.0.1';
 const RUNTIME_CACHE = 'workflow-runtime';
 
 const PRECACHE_URLS = [
