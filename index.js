@@ -1,3 +1,4 @@
+
 // ==========================================
 // CONFIGURATION & UTILS
 // ==========================================
@@ -9,12 +10,32 @@ const byId = (id) => document.getElementById(id);
 const qs = (selector) => document.querySelector(selector);
 const qsa = (selector) => document.querySelectorAll(selector);
 
+// Retry fetch with backoff for 429 errors
+async function fetchWithBackoff(url, options, retries = 3, backoff = 1000) {
+  try {
+    const response = await fetch(url, options);
+    if (response.status === 429 && retries > 0) {
+      console.warn(`429 Rate Limited. Retrying in ${backoff}ms...`);
+      await new Promise(r => setTimeout(r, backoff));
+      return fetchWithBackoff(url, options, retries - 1, backoff * 2);
+    }
+    return response;
+  } catch (error) {
+    if (retries > 0) {
+      console.warn(`Fetch error. Retrying in ${backoff}ms...`, error);
+      await new Promise(r => setTimeout(r, backoff));
+      return fetchWithBackoff(url, options, retries - 1, backoff * 2);
+    }
+    throw error;
+  }
+}
+
 // ==========================================
 // STATE MANAGEMENT
 // ==========================================
 let googleTokenClient;
 let googleAccessToken = localStorage.getItem('googleAccessToken') || null;
-let googleUserId = null; // Store user ID to detect account switches
+let googleUserId = null;
 let tokenExpiry = localStorage.getItem('tokenExpiry') || null;
 let allAssignmentsData = [];
 let allCoursesData = [];
@@ -22,6 +43,7 @@ let ignoredCourses = new Set(JSON.parse(localStorage.getItem('ignoredCourses') |
 let currentTheme = localStorage.getItem('theme') || 'dark';
 let previousAssignmentStates = JSON.parse(localStorage.getItem('previousStates') || '{}');
 let completionHistory = JSON.parse(localStorage.getItem('completionHistory') || '{}');
+let scheduleEvents = JSON.parse(localStorage.getItem('scheduleEvents') || '{}');
 let isLoading = false;
 let conversationHistory = [];
 
@@ -29,6 +51,8 @@ let statusChartInstance = null;
 let courseChartInstance = null;
 let productivityChartInstance = null;
 let currentProductivityView = 'today';
+let currentScheduleDate = new Date();
+let draggedAssignment = null;
 
 // ==========================================
 // SERVICE WORKER
@@ -44,23 +68,400 @@ if ('serviceWorker' in navigator) {
 }
 
 // ==========================================
-// NOTIFICATIONS
+// SCHEDULE EDITOR
+// ==========================================
+window.showScheduleEditor = function() {
+  showPage('schedule');
+  renderScheduleCalendar();
+  renderUnscheduledAssignments();
+}
+
+function renderScheduleCalendar() {
+  const container = byId('scheduleCalendar');
+  if (!container) return;
+
+  const year = currentScheduleDate.getFullYear();
+  const month = currentScheduleDate.getMonth();
+  
+  const firstDay = new Date(year, month, 1);
+  const lastDay = new Date(year, month + 1, 0);
+  const daysInMonth = lastDay.getDate();
+  const startingDayOfWeek = firstDay.getDay();
+
+  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'];
+
+  container.innerHTML = `
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+      <button class="btn btn-primary" onclick="changeScheduleMonth(-1)" style="padding: 0.5rem 1rem;">
+        <i class="ph ph-caret-left"></i>
+      </button>
+      <h3 style="margin: 0;">${monthNames[month]} ${year}</h3>
+      <button class="btn btn-primary" onclick="changeScheduleMonth(1)" style="padding: 0.5rem 1rem;">
+        <i class="ph ph-caret-right"></i>
+      </button>
+    </div>
+    
+    <div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; background: var(--border-color); border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden;">
+      ${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => 
+        `<div style="background: var(--card-bg); padding: 0.75rem; text-align: center; font-weight: 600; color: var(--text-secondary);">${day}</div>`
+      ).join('')}
+      
+      ${Array(startingDayOfWeek).fill(null).map(() => 
+        `<div style="background: var(--dark); min-height: 120px;"></div>`
+      ).join('')}
+      
+      ${Array.from({length: daysInMonth}, (_, i) => {
+        const day = i + 1;
+        const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        const events = scheduleEvents[dateKey] || [];
+        const isToday = new Date().toDateString() === new Date(year, month, day).toDateString();
+        
+        return `
+          <div 
+            class="calendar-day" 
+            data-date="${dateKey}"
+            style="background: var(--card-bg); min-height: 120px; padding: 0.5rem; cursor: pointer; border: 2px solid ${isToday ? 'var(--primary)' : 'transparent'}; position: relative;"
+            ondrop="handleScheduleDrop(event)"
+            ondragover="event.preventDefault()"
+          >
+            <div style="font-weight: 600; margin-bottom: 0.5rem; color: ${isToday ? 'var(--primary)' : 'var(--text-primary)'};">${day}</div>
+            <div class="schedule-events">
+              ${events.map(event => `
+                <div 
+                  class="schedule-event" 
+                  onclick="editScheduleEvent('${dateKey}', '${event.id}')"
+                  style="background: rgba(182, 109, 255, 0.2); border-left: 3px solid var(--primary); padding: 0.25rem 0.5rem; margin-bottom: 0.25rem; border-radius: 4px; font-size: 0.75rem; cursor: pointer; position: relative;"
+                  title="${event.title}"
+                >
+                  <div style="font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${event.title}</div>
+                  ${event.startTime ? `<div style="color: var(--text-secondary); font-size: 0.7rem;">${event.startTime} - ${event.endTime}</div>` : ''}
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
+}
+
+function renderUnscheduledAssignments() {
+  const container = byId('unscheduledList');
+  if (!container) return;
+
+  const scheduled = new Set();
+  Object.values(scheduleEvents).forEach(dayEvents => {
+    dayEvents.forEach(event => {
+      if (event.assignmentId) scheduled.add(event.assignmentId);
+    });
+  });
+
+  const filtered = allAssignmentsData.filter(a => 
+    !ignoredCourses.has(a.courseName) && 
+    a.status !== 'submitted' &&
+    !scheduled.has(a.title + '_' + a.courseName)
+  );
+
+  if (filtered.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state" style="padding: 2rem;">
+        <div class="empty-state-icon"><i class="ph ph-check-circle"></i></div>
+        <h4>All scheduled!</h4>
+        <p style="font-size: 0.875rem;">All assignments have been added to your calendar.</p>
+      </div>`;
+    return;
+  }
+
+  container.innerHTML = `
+    <div style="margin-bottom: 1rem;">
+      <button class="btn btn-primary" onclick="autoScheduleAll()" style="width: 100%;">
+        <i class="ph ph-magic-wand"></i> Auto-Schedule All
+      </button>
+    </div>
+    ${filtered.map(assignment => {
+      const dueDate = formatDueDate(assignment);
+      return `
+        <div 
+          class="unscheduled-assignment"
+          draggable="true"
+          ondragstart="handleAssignmentDragStart(event, ${JSON.stringify(assignment).replace(/"/g, '&quot;')})"
+          style="background: var(--card-bg); border: 1px solid var(--border-color); border-left: 3px solid ${assignment.status === 'late' ? 'var(--danger)' : 'var(--warning)'}; padding: 1rem; margin-bottom: 0.75rem; border-radius: 8px; cursor: grab;"
+        >
+          <div style="font-weight: 600; margin-bottom: 0.25rem;">${assignment.title}</div>
+          <div style="font-size: 0.875rem; color: var(--text-secondary);">${assignment.courseName}</div>
+          <div style="font-size: 0.75rem; color: ${assignment.status === 'late' ? 'var(--danger)' : 'var(--warning)'}; margin-top: 0.5rem;">
+            <i class="ph ph-calendar"></i> ${dueDate}
+          </div>
+        </div>
+      `;
+    }).join('')}
+  `;
+}
+
+window.handleAssignmentDragStart = function(event, assignment) {
+  draggedAssignment = assignment;
+  event.dataTransfer.effectAllowed = 'move';
+}
+
+window.handleScheduleDrop = function(event) {
+  event.preventDefault();
+  if (!draggedAssignment) return;
+
+  const dateKey = event.currentTarget.dataset.date;
+  if (!scheduleEvents[dateKey]) scheduleEvents[dateKey] = [];
+
+  const eventId = Date.now().toString();
+  scheduleEvents[dateKey].push({
+    id: eventId,
+    title: draggedAssignment.title,
+    assignmentId: draggedAssignment.title + '_' + draggedAssignment.courseName,
+    courseName: draggedAssignment.courseName,
+    startTime: '09:00',
+    endTime: '10:00',
+    alertBefore: 60,
+    link: draggedAssignment.link
+  });
+
+  localStorage.setItem('scheduleEvents', JSON.stringify(scheduleEvents));
+  draggedAssignment = null;
+  
+  renderScheduleCalendar();
+  renderUnscheduledAssignments();
+  showToast(`✅ Added to ${dateKey}`);
+}
+
+window.changeScheduleMonth = function(delta) {
+  const today = new Date();
+  const oneYearFromToday = new Date(today.getFullYear() + 1, today.getMonth(), 1);
+  
+  const newDate = new Date(currentScheduleDate.getFullYear(), currentScheduleDate.getMonth() + delta, 1);
+  
+  if (newDate < new Date(today.getFullYear(), today.getMonth(), 1)) {
+    showToast('⚠️ Cannot go to past months');
+    return;
+  }
+  
+  if (newDate >= oneYearFromToday) {
+    showToast('⚠️ Cannot schedule beyond one year');
+    return;
+  }
+  
+  currentScheduleDate = newDate;
+  renderScheduleCalendar();
+}
+
+window.autoScheduleAll = function() {
+  const scheduled = new Set();
+  Object.values(scheduleEvents).forEach(dayEvents => {
+    dayEvents.forEach(event => {
+      if (event.assignmentId) scheduled.add(event.assignmentId);
+    });
+  });
+
+  const unscheduled = allAssignmentsData.filter(a => 
+    !ignoredCourses.has(a.courseName) && 
+    a.status !== 'submitted' &&
+    !scheduled.has(a.title + '_' + a.courseName) &&
+    a.dueDate
+  );
+
+  unscheduled.forEach(assignment => {
+    const dueDate = parseGoogleDate(assignment.dueDate);
+    if (!dueDate) return;
+
+    const dateKey = `${dueDate.getFullYear()}-${String(dueDate.getMonth() + 1).padStart(2, '0')}-${String(dueDate.getDate()).padStart(2, '0')}`;
+    
+    if (!scheduleEvents[dateKey]) scheduleEvents[dateKey] = [];
+
+    scheduleEvents[dateKey].push({
+      id: Date.now().toString() + Math.random(),
+      title: assignment.title,
+      assignmentId: assignment.title + '_' + assignment.courseName,
+      courseName: assignment.courseName,
+      startTime: '14:00',
+      endTime: '16:00',
+      alertBefore: 120,
+      link: assignment.link
+    });
+  });
+
+  localStorage.setItem('scheduleEvents', JSON.stringify(scheduleEvents));
+  renderScheduleCalendar();
+  renderUnscheduledAssignments();
+  showToast(`✅ Auto-scheduled ${unscheduled.length} assignments`);
+}
+
+window.editScheduleEvent = function(dateKey, eventId) {
+  const events = scheduleEvents[dateKey];
+  if (!events) return;
+
+  const event = events.find(e => e.id === eventId);
+  if (!event) return;
+
+  const modal = document.createElement('div');
+  modal.style.cssText = `
+    position: fixed; top: 0; left: 0; width: 100%; height: 100vh;
+    background: rgba(0,0,0,0.7); z-index: 1000; display: flex;
+    align-items: center; justify-content: center; padding: 1rem;
+  `;
+  
+  modal.innerHTML = `
+    <div style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 2rem; max-width: 500px; width: 100%;">
+      <h3 style="margin-bottom: 1.5rem;">Edit Event</h3>
+      
+      <div style="margin-bottom: 1rem;">
+        <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Title</label>
+        <input type="text" id="eventTitle" value="${event.title}" style="width: 100%; padding: 0.75rem; background: var(--dark); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-primary); font-family: 'Poppins', sans-serif;">
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+        <div>
+          <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Start Time</label>
+          <input type="time" id="eventStart" value="${event.startTime}" style="width: 100%; padding: 0.75rem; background: var(--dark); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-primary); font-family: 'Poppins', sans-serif;">
+        </div>
+        <div>
+          <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">End Time</label>
+          <input type="time" id="eventEnd" value="${event.endTime}" style="width: 100%; padding: 0.75rem; background: var(--dark); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-primary); font-family: 'Poppins', sans-serif;">
+        </div>
+      </div>
+
+      <div style="margin-bottom: 1.5rem;">
+        <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Alert Before (minutes)</label>
+        <select id="eventAlert" style="width: 100%; padding: 0.75rem; background: var(--dark); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-primary); font-family: 'Poppins', sans-serif;">
+          <option value="0" ${event.alertBefore === 0 ? 'selected' : ''}>No Alert</option>
+          <option value="15" ${event.alertBefore === 15 ? 'selected' : ''}>15 minutes</option>
+          <option value="30" ${event.alertBefore === 30 ? 'selected' : ''}>30 minutes</option>
+          <option value="60" ${event.alertBefore === 60 ? 'selected' : ''}>1 hour</option>
+          <option value="120" ${event.alertBefore === 120 ? 'selected' : ''}>2 hours</option>
+          <option value="1440" ${event.alertBefore === 1440 ? 'selected' : ''}>1 day</option>
+        </select>
+      </div>
+
+      <div style="display: flex; gap: 1rem;">
+        <button class="btn btn-primary" onclick="saveScheduleEvent('${dateKey}', '${eventId}')" style="flex: 1;">Save</button>
+        <button class="btn btn-danger" onclick="deleteScheduleEvent('${dateKey}', '${eventId}')" style="flex: 1;">Delete</button>
+        <button class="btn" onclick="this.closest('[style*=fixed]').remove()" style="flex: 1; background: var(--dark); color: var(--text-primary);">Cancel</button>
+      </div>
+    </div>
+  `;
+  
+  document.body.appendChild(modal);
+}
+
+window.saveScheduleEvent = function(dateKey, eventId) {
+  const events = scheduleEvents[dateKey];
+  if (!events) return;
+
+  const event = events.find(e => e.id === eventId);
+  if (!event) return;
+
+  event.title = byId('eventTitle').value;
+  event.startTime = byId('eventStart').value;
+  event.endTime = byId('eventEnd').value;
+  event.alertBefore = parseInt(byId('eventAlert').value);
+
+  localStorage.setItem('scheduleEvents', JSON.stringify(scheduleEvents));
+  renderScheduleCalendar();
+  
+  document.querySelector('[style*=fixed]').remove();
+  showToast('✅ Event updated');
+}
+
+window.deleteScheduleEvent = function(dateKey, eventId) {
+  scheduleEvents[dateKey] = scheduleEvents[dateKey].filter(e => e.id !== eventId);
+  if (scheduleEvents[dateKey].length === 0) delete scheduleEvents[dateKey];
+  
+  localStorage.setItem('scheduleEvents', JSON.stringify(scheduleEvents));
+  renderScheduleCalendar();
+  renderUnscheduledAssignments();
+  
+  document.querySelector('[style*=fixed]').remove();
+  showToast('🗑️ Event deleted');
+}
+
+window.exportToICS = function() {
+  let icsContent = `BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//WorkFlow//Assignment Tracker//EN
+CALSCALE:GREGORIAN
+METHOD:PUBLISH
+X-WR-CALNAME:WorkFlow Assignments
+X-WR-TIMEZONE:UTC
+`;
+
+  Object.entries(scheduleEvents).forEach(([dateKey, events]) => {
+    events.forEach(event => {
+      const [year, month, day] = dateKey.split('-');
+      const [startHour, startMin] = event.startTime.split(':');
+      const [endHour, endMin] = event.endTime.split(':');
+      
+      const startDate = new Date(year, month - 1, day, startHour, startMin);
+      const endDate = new Date(year, month - 1, day, endHour, endMin);
+      
+      const formatICSDate = (date) => {
+        return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+      };
+
+      const uid = `${event.id}@workflow.app`;
+      
+      icsContent += `BEGIN:VEVENT
+UID:${uid}
+DTSTAMP:${formatICSDate(new Date())}
+DTSTART:${formatICSDate(startDate)}
+DTEND:${formatICSDate(endDate)}
+SUMMARY:${event.title}
+DESCRIPTION:Course: ${event.courseName}${event.link ? `\\nLink: ${event.link}` : ''}
+LOCATION:${event.courseName}
+STATUS:CONFIRMED
+SEQUENCE:0
+`;
+
+      if (event.alertBefore > 0) {
+        icsContent += `BEGIN:VALARM
+TRIGGER:-PT${event.alertBefore}M
+ACTION:DISPLAY
+DESCRIPTION:${event.title}
+END:VALARM
+`;
+      }
+
+      icsContent += `END:VEVENT
+`;
+    });
+  });
+
+  icsContent += `END:VCALENDAR`;
+
+  const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = 'workflow-assignments.ics';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  
+  showToast('📅 Calendar exported! Import to Apple Calendar, Google Calendar, or Outlook.');
+}
+
+// ==========================================
+// NOTIFICATIONS (Updated to respect ignored courses)
 // ==========================================
 const COMEDIC_MESSAGES = {
   dueTomorrow: [
     "Bad news twin 😬 '{title}' is due TOMORROW.",
-    "Tomorrow. '{title}'. That’s it. That’s the message.",
+    "Tomorrow. '{title}'. That's it. That's the message.",
     "'{title}' is due tomorrow. This is not a drill. Lock. In.",
     "You have exactly one (1) day left for '{title}'. Choose wisely.",
     "Not to ruin your vibe, but '{title}' is due tomorrow 👀"
   ],
 
   overdue: [
-    "So… '{title}' is {days} day(s) overdue 😭 Let’s pretend it’s fine and start now.",
+    "So… '{title}' is {days} day(s) overdue 😭 Let's pretend it's fine and start now.",
     "Yeahhh '{title}' was past due already by {days} day.",
-    "'{title}' is late. It happens. But atleast... let’s fix it.",
+    "'{title}' is late. It happens. But atleast... let's fix it.",
     "Respectfully… '{title}' is {days} day(s) overdue.",
-    "Forgot about '{title}' and now it’s overdue 💀"
+    "Forgot about '{title}' and now it's overdue 💀"
   ],
 
   dueSoonRandom: [
@@ -68,10 +469,9 @@ const COMEDIC_MESSAGES = {
     "No panic yet, but '{title}' is due in {days} days.",
     "This is your casual reminder that '{title}' is due in {days} days 👋",
     "Future you is begging you to start '{title}'. {days} days remaining.",
-    "You’re still chilling, but '{title}' is due in {days} days. Just saying."
+    "You're still chilling, but '{title}' is due in {days} days. Just saying."
   ]
 };
-
 
 window.requestNotificationPermission = async function() {
   if (!('Notification' in window)) {
@@ -80,7 +480,6 @@ window.requestNotificationPermission = async function() {
   }
 
   const permission = await Notification.requestPermission();
-  console.log('5. New permission:', permission);
   
   if (permission === 'granted') {
     byId('notificationPermission').style.display = 'none';
@@ -101,21 +500,17 @@ async function subscribeToPush() {
   try {
     const registration = await navigator.serviceWorker.ready;
     
-    // Get VAPID Key from Server
     const response = await fetch('/api/vapidPublicKey');
     const { publicKey } = await response.json();
     
     const convertedVapidKey = urlBase64ToUint8Array(publicKey);
 
-    // Subscribe user
     const subscription = await registration.pushManager.subscribe({
       userVisibleOnly: true,
       applicationServerKey: convertedVapidKey
     });
 
     console.log('✅ Push Subscribed:', subscription);
-    
-    // Send subscription + data to server
     syncWithServer(subscription);
 
   } catch (error) {
@@ -130,20 +525,17 @@ async function syncWithServer(subscription = null) {
       subscription = await registration.pushManager.getSubscription();
     }
     
-    if (!subscription) return; // User hasn't enabled push yet
+    if (!subscription) return;
 
-    // Determine refresh token (only send if we just got it)
-    // Note: We don't store refresh token in localStorage for security (usually), 
-    // but here we are relying on the one-time exchange or if we decide to store it.
-    // Ideally, we send it once right after login.
-    // For now, let's assume the backend handles the persistence, and we just send assignment data updates.
-    // If we have a stored refresh token in memory (from immediate login), send it.
-    
+    // Only send non-ignored assignments
+    const filteredAssignments = allAssignmentsData.filter(a => !ignoredCourses.has(a.courseName));
+
     const payload = {
-      clientId: subscription.endpoint, // Use endpoint as unique ID
+      clientId: subscription.endpoint,
       subscription: subscription,
-      assignments: allAssignmentsData,
-      refreshToken: window.tempRefreshToken || null 
+      assignments: filteredAssignments,
+      refreshToken: window.tempRefreshToken || null,
+      userId: googleUserId
     };
 
     await fetch('/api/subscribe', {
@@ -152,7 +544,6 @@ async function syncWithServer(subscription = null) {
       body: JSON.stringify(payload)
     });
     
-    // Clear temp token after sending
     if (window.tempRefreshToken) window.tempRefreshToken = null;
     
     console.log('✅ Synced data with server');
@@ -175,6 +566,11 @@ function urlBase64ToUint8Array(base64String) {
     outputArray[i] = rawData.charCodeAt(i);
   }
   return outputArray;
+}
+
+function scheduleNotificationChecks() {
+  checkAndSendNotifications();
+  setInterval(checkAndSendNotifications, 60 * 60 * 1000);
 }
 
 function scheduleNotificationChecks() {
@@ -958,30 +1354,10 @@ async function loadAssignments() {
           source: 'google',
           title: 'Lab Report: Kinematics',
           courseName: 'AP Physics',
-          description: 'Write a full lab report on the projectile motion experiment. Include error analysis and graphs.',
+          description: 'Write a full lab report on the projectile motion experiment.',
           maxPoints: 100,
           dueDate: { year: 2024, month: 11, day: 20 },
           status: 'late',
-          link: '#'
-        },
-        {
-          source: 'google',
-          title: 'Read Chapter 4',
-          courseName: 'World History',
-          description: 'Read chapter 4 and answer the review questions at the end.',
-          maxPoints: 10,
-          dueDate: { year: 2024, month: 11, day: 25 },
-          status: 'pending',
-          link: '#'
-        },
-        {
-          source: 'google',
-          title: 'Essay Draft',
-          courseName: 'English Lit',
-          description: 'Submit your first draft of the Macbeth analysis essay. Minimum 500 words.',
-          maxPoints: 50,
-          dueDate: { year: 2024, month: 11, day: 26 },
-          status: 'pending',
           link: '#'
         }
       ];
@@ -993,6 +1369,7 @@ async function loadAssignments() {
       return;
     }
 
+    // Fetch user info
     const userinfo = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
       headers: { Authorization: `Bearer ${googleAccessToken}` }
     });
@@ -1004,13 +1381,34 @@ async function loadAssignments() {
 
     if (userinfo.ok) {
       const pfp = await userinfo.json();
-      googleUserId = pfp.sub; // Capture User ID
+      googleUserId = pfp.sub;
+      
+      // Cache profile picture in localStorage to avoid repeated requests
+      const cachedPic = localStorage.getItem('userProfilePic');
+      const cachedName = localStorage.getItem('userName');
+      
       const avatarDiv = qs('.user-avatar');
-      if (pfp.picture) avatarDiv.style.backgroundImage = `url(${pfp.picture})`;
-      if (pfp.name) qs('.user-name').textContent = pfp.name;
+      const nameDiv = qs('.user-name');
+      
+      if (pfp.picture && pfp.picture !== cachedPic) {
+        // Only update if different
+        localStorage.setItem('userProfilePic', pfp.picture);
+        avatarDiv.style.backgroundImage = `url(${pfp.picture})`;
+      } else if (cachedPic) {
+        // Use cached version
+        avatarDiv.style.backgroundImage = `url(${cachedPic})`;
+      }
+      
+      if (pfp.name && pfp.name !== cachedName) {
+        localStorage.setItem('userName', pfp.name);
+        nameDiv.textContent = pfp.name;
+      } else if (cachedName) {
+        nameDiv.textContent = cachedName;
+      }
     }
 
-    const coursesResponse = await fetch(
+    // Fetch courses
+    const coursesResponse = await fetchWithBackoff(
       'https://classroom.googleapis.com/v1/courses?studentId=me&courseStates=ACTIVE',
       { headers: { 'Authorization': `Bearer ${googleAccessToken}` }}
     );
@@ -1026,11 +1424,23 @@ async function loadAssignments() {
     const courses = coursesData.courses || [];
     allCoursesData = courses;
     
-    const flatAssignments = [];
-    
-    for (const course of courses) {
+    // Calculate cutoff: 365 days ago
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const oneYearAgo = new Date();
+    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+
+    const allAssignments = [];
+
+    // SEQUENTIAL processing with small delays to avoid rate limits
+    for (let i = 0; i < courses.length; i++) {
+      const course = courses[i];
+      
       try {
-        const courseworkResponse = await fetch(
+        // Small delay between courses
+        if (i > 0) await new Promise(r => setTimeout(r, 200));
+        
+        const courseworkResponse = await fetchWithBackoff(
           `https://classroom.googleapis.com/v1/courses/${course.id}/courseWork`,
           { headers: { 'Authorization': `Bearer ${googleAccessToken}` }}
         );
@@ -1038,14 +1448,30 @@ async function loadAssignments() {
         if (!courseworkResponse.ok) continue;
 
         const courseworkData = await courseworkResponse.json();
-        const coursework = courseworkData.courseWork || [];
+        let coursework = courseworkData.courseWork || [];
+
+        // Filter out old assignments BEFORE fetching submissions
+        coursework = coursework.filter(work => {
+          if (!work.dueDate) return true;
+          
+          const dueDate = new Date(work.dueDate.year, work.dueDate.month - 1, work.dueDate.day);
+          const daysSinceDue = Math.floor((today - dueDate) / (1000 * 60 * 60 * 24));
+          
+          // Skip if older than 1 year OR overdue by 365+ days
+          return dueDate >= oneYearAgo && daysSinceDue < 365;
+        });
         
-        const BATCH_SIZE = 5;
-        for (let i = 0; i < coursework.length; i += BATCH_SIZE) {
-          const batch = coursework.slice(i, i + BATCH_SIZE);
-          const assignmentPromises = batch.map(async (work) => {
+        // Process submissions in small batches with delays
+        const BATCH_SIZE = 3;
+        for (let j = 0; j < coursework.length; j += BATCH_SIZE) {
+          const batch = coursework.slice(j, j + BATCH_SIZE);
+          
+          // Small delay between batches
+          if (j > 0) await new Promise(r => setTimeout(r, 100));
+          
+          const batchResults = await Promise.all(batch.map(async (work) => {
             try {
-              const submissionResponse = await fetch(
+              const submissionResponse = await fetchWithBackoff(
                 `https://classroom.googleapis.com/v1/courses/${course.id}/courseWork/${work.id}/studentSubmissions`,
                 { headers: { 'Authorization': `Bearer ${googleAccessToken}` }}
               );
@@ -1079,24 +1505,33 @@ async function loadAssignments() {
               console.error(`Error loading submission:`, error);
               return null;
             }
-          });
+          }));
           
-          const batchResults = await Promise.all(assignmentPromises);
-          flatAssignments.push(...batchResults.filter(a => a !== null));
+          allAssignments.push(...batchResults.filter(a => a !== null));
         }
+
       } catch (error) {
         console.error(`Error loading coursework for ${course.name}:`, error);
       }
     }
     
-    allAssignmentsData = flatAssignments;
-    recalculateProductivityFromHistory(flatAssignments);
-    displayAssignments(flatAssignments);
-    updateStats(flatAssignments);
+    // FINAL FILTER: Remove 365+ day overdue assignments
+    allAssignmentsData = allAssignments.filter(assignment => {
+      if (!assignment.dueDate) return true;
+      
+      const dueDate = new Date(assignment.dueDate.year, assignment.dueDate.month - 1, assignment.dueDate.day);
+      const daysSinceDue = Math.floor((today - dueDate) / (1000 * 60 * 60 * 24));
+      
+      return daysSinceDue < 365;
+    });
+    
+    recalculateProductivityFromHistory(allAssignmentsData);
+    displayAssignments(allAssignmentsData);
+    updateStats(allAssignmentsData);
     
     // Sync with Server for Push Notifications
     if (localStorage.getItem('notificationsEnabled') === 'true') {
-        syncWithServer();
+      syncWithServer();
     }
 
   } finally {
@@ -1201,25 +1636,26 @@ function formatDueDate(assignment) {
 // ==========================================
 window.showPage = function(page) {
   qsa('.sidebar-menu-item').forEach(item => item.classList.remove('active'));
-  // Note: 'event' is available in the global scope when called from HTML inline handlers
   if (typeof event !== 'undefined' && event.target && event.target.closest) {
-      const item = event.target.closest('.sidebar-menu-item');
-      if (item) item.classList.add('active');
+    const item = event.target.closest('.sidebar-menu-item');
+    if (item) item.classList.add('active');
   }
 
-  // Updated 'aiAssistant' to match HTML ID 'aiAssistantPage' (no hyphen)
-  const pages = ['assignments', 'statistics', 'aiAssistant', 'courses', 'settings', 'help'];
+  const pages = ['assignments', 'statistics', 'aiAssistant', 'schedule', 'courses', 'settings', 'help'];
   pages.forEach(p => {
-      const el = byId(p + 'Page');
-      if (el) el.style.display = 'none';
+    const el = byId(p + 'Page');
+    if (el) el.style.display = 'none';
   });
-
   if (page === 'statistics') {
     byId('statisticsPage').style.display = 'block';
     generateStatistics();
   } else if (page === 'aiAssistant') {
     byId('aiAssistantPage').style.display = 'block';
     initAIAssistant();
+  } else if (page === 'schedule') {
+    byId('schedulePage').style.display = 'block';
+    renderScheduleCalendar();
+    renderUnscheduledAssignments();
   } else if (page === 'assignments') {
     byId('assignmentsPage').style.display = 'block';
   } else if (page === 'courses') {
@@ -1230,9 +1666,6 @@ window.showPage = function(page) {
     initializeSettings();
   } else if (page === 'help') {
     byId('helpPage').style.display = 'block';
-  } else if (page === 'dashboard') {
-      // Assuming dashboard falls back to assignments or similar if explicit
-      byId('assignmentsPage').style.display = 'block';
   }
 }
 
@@ -1358,6 +1791,8 @@ function showLoginScreen() {
   googleAccessToken = null;
   localStorage.removeItem('googleAccessToken');
   localStorage.removeItem('tokenExpiry');
+  localStorage.removeItem('userProfilePic'); // Add this
+  localStorage.removeItem('userName'); // Add this
 }
 
 function showError(message) {
@@ -1459,12 +1894,15 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 
     if (GOOGLE_CLIENT_ID && !GOOGLE_CLIENT_ID.includes('YOUR_')) {
-      // requestCode() triggers the pop-up to get the auth code
       googleTokenClient.requestCode();
     } else {
       showError('Please configure your Google Client ID first!');
     }
   });
 
-  byId('logoutBtn')?.addEventListener('click', showLoginScreen);
+  byId('logoutBtn')?.addEventListener('click', () => {
+    localStorage.removeItem('userProfilePic');
+    localStorage.removeItem('userName');
+    showLoginScreen();
+  });
 });

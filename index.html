@@ -747,7 +747,28 @@
             max-height: 500px; /* Arbitrary large height */
             border-top-color: var(--border-color);
         }
+        
+        .calendar-day:hover {
+            background: rgba(182, 109, 255, 0.05) !important;
+        }
+        .unscheduled-assignment:active {
+            cursor: grabbing;
+            opacity: 0.7;
+        }
 
+        .schedule-event:hover {
+            background: rgba(182, 109, 255, 0.3) !important;
+        }
+
+        @media (max-width: 991px) {
+            #schedulePage > div:first-of-type {
+                grid-template-columns: 1fr !important;
+            }
+            
+            #schedulePage .card:first-child {
+                max-height: 300px;
+            }
+        }
         @media (max-width: 991px) {
             .sidebar {
                 transform: translateX(-100%);
@@ -815,7 +836,11 @@
                     <span class="sidebar-menu-icon"><i class="ph ph-magic-wand"></i></span>
                     <span>AI Assistant</span>
                 </a>
-                
+                <a class="sidebar-menu-item" onclick="showPage('schedule')">
+                    <span class="sidebar-menu-icon"><i class="ph ph-calendar-blank"></i></span>
+                    <span>Schedule Editor</span>
+                </a>
+
                 <div class="sidebar-section-label">Preferences</div>
 
                 <a class="sidebar-menu-item" onclick="showPage('courses')">
@@ -1057,7 +1082,55 @@
                         </div>
                     </div>
                 </div>
+                <!-- Schedule Editor Page -->
+                <div id="schedulePage" style="display: none;">
+                    <div class="page-header">
+                        <h3><i class="ph ph-calendar-blank" style="margin-right: 0.5rem; color: var(--primary);"></i>Schedule Editor</h3>
+                        <p style="color: var(--text-secondary);">Drag assignments to schedule them, then export to your calendar app</p>
+                    </div>
 
+                    <div style="display: grid; grid-template-columns: 300px 1fr; gap: 1.5rem; margin-bottom: 1.5rem;">
+                        <!-- Unscheduled Assignments Sidebar -->
+                        <div class="card" style="max-height: 600px; overflow-y: auto;">
+                            <div class="card-title" style="position: sticky; top: 0; background: var(--card-bg); z-index: 10; padding-bottom: 1rem;">
+                                <i class="ph ph-list" style="margin-right: 0.5rem;"></i>
+                                Pending Assignments
+                            </div>
+                            <div id="unscheduledList"></div>
+                        </div>
+
+                        <!-- Calendar View -->
+                        <div class="card">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                                <div class="card-title" style="margin: 0;">
+                                    <i class="ph ph-calendar" style="margin-right: 0.5rem;"></i>
+                                    Calendar
+                                </div>
+                                <button class="btn btn-primary" onclick="exportToICS()">
+                                    <i class="ph ph-download"></i> Export to .ics
+                                </button>
+                            </div>
+                            <div id="scheduleCalendar"></div>
+                        </div>
+                    </div>
+
+                    <div class="card" style="background: rgba(182, 109, 255, 0.1); border-color: var(--primary);">
+                        <div style="display: flex; align-items: center; gap: 1rem;">
+                            <div style="font-size: 2rem; color: var(--primary);">
+                                <i class="ph ph-info"></i>
+                            </div>
+                            <div>
+                                <div style="font-weight: 600; margin-bottom: 0.25rem;">How to use</div>
+                                <ul style="margin: 0; padding-left: 1.5rem; color: var(--text-secondary); font-size: 0.875rem;">
+                                    <li>Drag assignments from the left panel onto calendar days</li>
+                                    <li>Click on scheduled events to edit time and alerts</li>
+                                    <li>Use "Auto-Schedule All" to automatically place assignments on their due dates</li>
+                                    <li>Export to .ics file to import into Apple Calendar, Google Calendar, or Outlook</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 <!-- Help & FAQ Page -->
                 <div id="helpPage" style="display: none;">
                     <div class="page-header">
