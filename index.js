@@ -102,7 +102,7 @@ let ignoredCourses = new Set(JSON.parse(localStorage.getItem('ignoredCourses') |
 let currentTheme = localStorage.getItem('theme') || 'dark';
 let previousAssignmentStates = JSON.parse(localStorage.getItem('previousStates') || '{}');
 let completionHistory = JSON.parse(localStorage.getItem('completionHistory') || '{}');
-let scheduleEvents = JSON.parse(localStorage.getItem('scheduleEvents') || '{}');
+let scheduleEvents = {};
 let isLoading = false;
 let conversationHistory = [];
 
@@ -112,6 +112,7 @@ let productivityChartInstance = null;
 let currentProductivityView = 'today';
 let currentScheduleDate = new Date();
 let draggedAssignment = null;
+let draggedScheduleEvent = null;
 
 // ==========================================
 // SCHEDULE EDITOR - COMPLETE SECTION
@@ -182,8 +183,10 @@ function renderScheduleCalendar() {
               ${events.map(event => `
                 <div 
                   class="schedule-event" 
+                  draggable="true"
+                  ondragstart="handleScheduledEventDragStart(event, '${dateKey}', '${event.id}')"
                   onclick="editScheduleEvent('${dateKey}', '${event.id}')"
-                  style="background: rgba(182, 109, 255, 0.2); border-left: 3px solid var(--primary); padding: 0.25rem 0.5rem; margin-bottom: 0.25rem; border-radius: 4px; font-size: 0.75rem; cursor: pointer; position: relative;"
+                  style="background: rgba(182, 109, 255, 0.2); border-left: 3px solid var(--primary); padding: 0.25rem 0.5rem; margin-bottom: 0.25rem; border-radius: 4px; font-size: 0.75rem; cursor: grab; position: relative;"
                   title="${event.title}"
                 >
                   <div style="font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${event.title}</div>
@@ -310,10 +313,33 @@ function handleDragEnd(e) {
 }
 window.handleAssignmentDragStart = function(event, assignment) {
   draggedAssignment = assignment;
+  draggedScheduleEvent = null;
   event.dataTransfer.effectAllowed = 'move';
   
   // Use the actual element as drag image
   event.dataTransfer.setDragImage(event.currentTarget, event.currentTarget.offsetWidth / 2, 20);
+}
+
+window.handleScheduledEventDragStart = function(event, dateKey, eventId) {
+  event.stopPropagation(); // Prevent bubbling if needed
+  
+  const dayEvents = scheduleEvents[dateKey];
+  if (!dayEvents) return;
+  
+  const existingEvent = dayEvents.find(e => e.id === eventId);
+  if (!existingEvent) return;
+
+  draggedScheduleEvent = {
+    event: existingEvent,
+    oldDateKey: dateKey
+  };
+  draggedAssignment = null;
+
+  event.dataTransfer.effectAllowed = 'move';
+  
+  // Create drag ghost if desired, or use default
+  // Just setting opacity for visual feedback
+  event.currentTarget.style.opacity = '0.5';
 }
 
 window.handleDragOver = function(event) {
@@ -337,10 +363,39 @@ window.handleScheduleDrop = function(event) {
   
   // IMPORTANT: Clear the gray background immediately
   event.currentTarget.style.background = 'var(--card-bg)';
-  
+  const dateKey = event.currentTarget.dataset.date;
+
+  if (draggedScheduleEvent) {
+    // Handle moving existing event
+    if (draggedScheduleEvent.oldDateKey === dateKey) {
+      // Dropped on same day, just refresh to clear drag styles
+      draggedScheduleEvent = null;
+      renderScheduleCalendar();
+      return;
+    }
+
+    if (!scheduleEvents[dateKey]) scheduleEvents[dateKey] = [];
+    
+    // Remove from old date
+    scheduleEvents[draggedScheduleEvent.oldDateKey] = scheduleEvents[draggedScheduleEvent.oldDateKey]
+      .filter(e => e.id !== draggedScheduleEvent.event.id);
+      
+    if (scheduleEvents[draggedScheduleEvent.oldDateKey].length === 0) {
+      delete scheduleEvents[draggedScheduleEvent.oldDateKey];
+    }
+    
+    // Add to new date
+    scheduleEvents[dateKey].push(draggedScheduleEvent.event);
+    
+    draggedScheduleEvent = null;
+    
+    renderScheduleCalendar();
+    showToast(`✅ Moved to ${dateKey}`);
+    return;
+  }
+
   if (!draggedAssignment) return;
 
-  const dateKey = event.currentTarget.dataset.date;
   if (!scheduleEvents[dateKey]) scheduleEvents[dateKey] = [];
 
   const eventId = Date.now().toString();
@@ -355,7 +410,6 @@ window.handleScheduleDrop = function(event) {
     link: draggedAssignment.link
   });
 
-  localStorage.setItem('scheduleEvents', JSON.stringify(scheduleEvents));
   draggedAssignment = null;
   
   renderScheduleCalendar();
@@ -418,7 +472,6 @@ window.autoScheduleAll = function() {
     });
   });
 
-  localStorage.setItem('scheduleEvents', JSON.stringify(scheduleEvents));
   renderScheduleCalendar();
   renderUnscheduledAssignments();
   showToast(`✅ Auto-scheduled ${unscheduled.length} assignments`);
@@ -493,7 +546,6 @@ window.saveScheduleEvent = function(dateKey, eventId) {
   event.endTime = byId('eventEnd').value;
   event.alertBefore = parseInt(byId('eventAlert').value);
 
-  localStorage.setItem('scheduleEvents', JSON.stringify(scheduleEvents));
   renderScheduleCalendar();
   
   document.querySelector('[style*=fixed]').remove();
@@ -504,7 +556,6 @@ window.deleteScheduleEvent = function(dateKey, eventId) {
   scheduleEvents[dateKey] = scheduleEvents[dateKey].filter(e => e.id !== eventId);
   if (scheduleEvents[dateKey].length === 0) delete scheduleEvents[dateKey];
   
-  localStorage.setItem('scheduleEvents', JSON.stringify(scheduleEvents));
   renderScheduleCalendar();
   renderUnscheduledAssignments();
   
@@ -1857,10 +1908,28 @@ function showLoginScreen() {
   byId('loginPage').style.display = 'flex';
   byId('dashboardPage').style.display = 'none';
   googleAccessToken = null;
+  
+  // Clear persistent auth and user data
   localStorage.removeItem('googleAccessToken');
   localStorage.removeItem('tokenExpiry');
-  localStorage.removeItem('userProfilePic'); // Add this
-  localStorage.removeItem('userName'); // Add this
+  localStorage.removeItem('userProfilePic');
+  localStorage.removeItem('userName');
+  
+  // Clear user-specific app data
+  localStorage.removeItem('completionHistory');
+  localStorage.removeItem('previousStates');
+  localStorage.removeItem('ignoredCourses');
+  
+  // Reset in-memory state
+  scheduleEvents = {};
+  conversationHistory = [];
+  completionHistory = {};
+  previousAssignmentStates = {};
+  ignoredCourses = new Set();
+  
+  // Clear UI
+  const chatMessages = byId('chatMessages');
+  if (chatMessages) chatMessages.innerHTML = '';
 }
 
 function showError(message) {
