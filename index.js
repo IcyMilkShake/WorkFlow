@@ -1026,21 +1026,33 @@ async function loadAssignments() {
     const courses = coursesData.courses || [];
     allCoursesData = courses;
     
-    const flatAssignments = [];
-    
-    for (const course of courses) {
+    // Calculate cutoff date (1 year ago)
+    const oneYearAgo = new Date();
+    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+
+    // Fetch assignments for all courses in parallel
+    const coursesPromises = courses.map(async (course) => {
       try {
         const courseworkResponse = await fetch(
           `https://classroom.googleapis.com/v1/courses/${course.id}/courseWork`,
           { headers: { 'Authorization': `Bearer ${googleAccessToken}` }}
         );
 
-        if (!courseworkResponse.ok) continue;
+        if (!courseworkResponse.ok) return [];
 
         const courseworkData = await courseworkResponse.json();
-        const coursework = courseworkData.courseWork || [];
+        let coursework = courseworkData.courseWork || [];
+
+        // Filter: Skip assignments due more than 1 year ago
+        coursework = coursework.filter(work => {
+          const date = parseGoogleDate(work.dueDate);
+          if (!date) return true; // Keep if no due date
+          return date >= oneYearAgo;
+        });
         
+        const courseAssignments = [];
         const BATCH_SIZE = 5;
+
         for (let i = 0; i < coursework.length; i += BATCH_SIZE) {
           const batch = coursework.slice(i, i + BATCH_SIZE);
           const assignmentPromises = batch.map(async (work) => {
@@ -1082,17 +1094,21 @@ async function loadAssignments() {
           });
           
           const batchResults = await Promise.all(assignmentPromises);
-          flatAssignments.push(...batchResults.filter(a => a !== null));
+          courseAssignments.push(...batchResults.filter(a => a !== null));
         }
+        return courseAssignments;
+
       } catch (error) {
         console.error(`Error loading coursework for ${course.name}:`, error);
+        return [];
       }
-    }
-    
-    allAssignmentsData = flatAssignments;
-    recalculateProductivityFromHistory(flatAssignments);
-    displayAssignments(flatAssignments);
-    updateStats(flatAssignments);
+    });
+
+    const results = await Promise.all(coursesPromises);
+    allAssignmentsData = results.flat();
+    recalculateProductivityFromHistory(allAssignmentsData);
+    displayAssignments(allAssignmentsData);
+    updateStats(allAssignmentsData);
     
     // Sync with Server for Push Notifications
     if (localStorage.getItem('notificationsEnabled') === 'true') {
