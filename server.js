@@ -463,7 +463,7 @@ app.get('', (req, res) => {
 });
 
 // Start the server
-const PORT = process.env.PORT || 8080;
+const PORT = process.env.PORT || 8000;
 // Bind to 0.0.0.0 to allow external access (AWS requirement)
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);

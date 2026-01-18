@@ -114,8 +114,13 @@ let currentScheduleDate = new Date();
 let draggedAssignment = null;
 
 // ==========================================
-// SCHEDULE EDITOR
+// SCHEDULE EDITOR - COMPLETE SECTION
+// Replace everything from "// SCHEDULE EDITOR" to "// NOTIFICATIONS"
 // ==========================================
+
+let draggedElement = null;
+let ghostElement = null;
+
 window.showScheduleEditor = function() {
   showPage('schedule');
   renderScheduleCalendar();
@@ -167,9 +172,10 @@ function renderScheduleCalendar() {
           <div 
             class="calendar-day" 
             data-date="${dateKey}"
-            style="background: var(--card-bg); min-height: 120px; padding: 0.5rem; cursor: pointer; border: 2px solid ${isToday ? 'var(--primary)' : 'transparent'}; position: relative;"
+            style="background: var(--card-bg); min-height: 120px; padding: 0.5rem; cursor: pointer; border: 2px solid ${isToday ? 'var(--primary)' : 'transparent'}; position: relative; transition: all 0.2s ease;"
             ondrop="handleScheduleDrop(event)"
-            ondragover="event.preventDefault()"
+            ondragover="handleDragOver(event)"
+            ondragleave="handleDragLeave(event)"
           >
             <div style="font-weight: 600; margin-bottom: 0.5rem; color: ${isToday ? 'var(--primary)' : 'var(--text-primary)'};">${day}</div>
             <div class="schedule-events">
@@ -177,7 +183,7 @@ function renderScheduleCalendar() {
                 <div 
                   class="schedule-event" 
                   onclick="editScheduleEvent('${dateKey}', '${event.id}')"
-                  style="background: rgba(182, 109, 255, 0.2); border-left: 3px solid var(--primary); padding: 0.25rem 0.5rem; margin-bottom: 0.25rem; border-radius: 4px; font-size: 0.75rem; cursor: pointer; position: relative;"
+                  style="background: rgba(182, 109, 255, 0.2); border-left: 3px solid var(--primary); padding: 0.25rem 0.5rem; margin-bottom: 0.25rem; border-radius: 4px; font-size: 0.75rem; cursor: pointer; position: relative; transition: all 0.2s;"
                   title="${event.title}"
                 >
                   <div style="font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${event.title}</div>
@@ -211,7 +217,6 @@ function renderUnscheduledAssignments() {
     !scheduled.has(a.title + '_' + a.courseName)
   );
   
-  // Clean up previous button if exists
   const existingBtn = header.querySelector('#autoScheduleBtn');
   if (existingBtn) existingBtn.remove();
 
@@ -225,7 +230,6 @@ function renderUnscheduledAssignments() {
     return;
   }
 
-  // Inject button into header
   const btnDiv = document.createElement('div');
   btnDiv.id = 'autoScheduleBtn';
   btnDiv.style.width = '100%';
@@ -242,9 +246,8 @@ function renderUnscheduledAssignments() {
       return `
         <div 
           class="unscheduled-assignment"
-          draggable="true"
-          ondragstart="handleAssignmentDragStart(event, ${JSON.stringify(assignment).replace(/"/g, '&quot;')})"
-          style="background: var(--card-bg); border: 1px solid var(--border-color); border-left: 3px solid ${assignment.status === 'late' ? 'var(--danger)' : 'var(--warning)'}; padding: 1rem; margin-bottom: 0.75rem; border-radius: 8px; cursor: grab;"
+          data-assignment='${JSON.stringify(assignment).replace(/'/g, "&#39;")}'
+          style="background: var(--card-bg); border: 1px solid var(--border-color); border-left: 3px solid ${assignment.status === 'late' ? 'var(--danger)' : 'var(--warning)'}; padding: 1rem; margin-bottom: 0.75rem; border-radius: 8px; cursor: grab; transition: all 0.2s;"
         >
           <div style="font-weight: 600; margin-bottom: 0.25rem;">${assignment.title}</div>
           <div style="font-size: 0.875rem; color: var(--text-secondary);">${assignment.courseName}</div>
@@ -254,13 +257,91 @@ function renderUnscheduledAssignments() {
         </div>
       `;
     }).join('');
+
+  // Attach new drag handlers
+  container.querySelectorAll('.unscheduled-assignment').forEach(el => {
+    el.draggable = true;
+    el.addEventListener('dragstart', handleDragStart);
+    el.addEventListener('dragend', handleDragEnd);
+  });
 }
 
+function handleDragStart(e) {
+  draggedElement = e.currentTarget;
+  draggedAssignment = JSON.parse(e.currentTarget.dataset.assignment);
+  
+  draggedElement.style.cursor = 'grabbing';
+  draggedElement.style.opacity = '0.5';
+  
+  // Create custom drag ghost
+  ghostElement = draggedElement.cloneNode(true);
+  ghostElement.style.position = 'absolute';
+  ghostElement.style.top = '-9999px';
+  ghostElement.style.left = '-9999px';
+  ghostElement.style.width = draggedElement.offsetWidth + 'px';
+  ghostElement.style.opacity = '0.9';
+  ghostElement.style.transform = 'rotate(-2deg)';
+  ghostElement.style.boxShadow = '0 10px 30px rgba(0,0,0,0.3)';
+  ghostElement.style.pointerEvents = 'none';
+  ghostElement.style.zIndex = '9999';
+  document.body.appendChild(ghostElement);
+  
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setDragImage(ghostElement, ghostElement.offsetWidth / 2, ghostElement.offsetHeight / 2);
+}
+
+function handleDragEnd(e) {
+  if (draggedElement) {
+    draggedElement.style.opacity = '1';
+    draggedElement.style.cursor = 'grab';
+  }
+  
+  if (ghostElement) {
+    ghostElement.remove();
+    ghostElement = null;
+  }
+  
+  document.querySelectorAll('.calendar-day').forEach(day => {
+    day.style.background = '';
+    day.style.transform = '';
+  });
+  
+  draggedElement = null;
+}
 window.handleAssignmentDragStart = function(event, assignment) {
   draggedAssignment = assignment;
+  
+  // Create a clone that follows cursor
+  const clone = event.currentTarget.cloneNode(true);
+  clone.style.position = 'absolute';
+  clone.style.top = '-9999px';
+  clone.style.width = event.currentTarget.offsetWidth + 'px';
+  clone.style.pointerEvents = 'none';
+  document.body.appendChild(clone);
+  
   event.dataTransfer.effectAllowed = 'move';
+  event.dataTransfer.setDragImage(clone, clone.offsetWidth / 2, 20);
+  
+  // Clean up after drag starts
+  setTimeout(() => clone.remove(), 0);
 }
 
+window.handleDragOver = function(event) {
+  event.preventDefault();
+  event.dataTransfer.dropEffect = 'move';
+  
+  const target = event.currentTarget;
+  target.style.background = 'rgba(182, 109, 255, 0.1)';
+  target.style.transform = 'scale(1.02)';
+}
+
+window.handleDragLeave = function(event) {
+  const target = event.currentTarget;
+  target.style.background = '';
+  target.style.transform = '';
+}
+
+// Find and replace this function:
 window.handleScheduleDrop = function(event) {
   event.preventDefault();
   if (!draggedAssignment) return;
