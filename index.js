@@ -154,31 +154,36 @@ function renderScheduleCalendar() {
       </button>
     </div>
     
-    <div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; background: var(--border-color); border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden;">
+    <div class="calendar-grid">
       ${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => 
-        `<div style="background: var(--card-bg); padding: 0.75rem; text-align: center; font-weight: 600; color: var(--text-secondary);">${day}</div>`
+        `<div class="calendar-header-cell">${day}</div>`
       ).join('')}
       
       ${Array(startingDayOfWeek).fill(null).map(() => 
-        `<div style="background: var(--dark); min-height: 120px;"></div>`
+        `<div class="calendar-day" style="background: var(--dark); min-height: 120px; opacity: 0.5; cursor: default;"></div>`
       ).join('')}
       
       ${Array.from({length: daysInMonth}, (_, i) => {
         const day = i + 1;
+        const dateObj = new Date(year, month, day);
         const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        const dayOfWeek = dateObj.toLocaleDateString('en-US', { weekday: 'short' });
         const events = scheduleEvents[dateKey] || [];
-        const isToday = new Date().toDateString() === new Date(year, month, day).toDateString();
+        const isToday = new Date().toDateString() === dateObj.toDateString();
         
       return `
         <div 
           class="calendar-day" 
           data-date="${dateKey}"
-          style="background: var(--card-bg); min-height: 120px; padding: 0.5rem; cursor: pointer; border: 2px solid ${isToday ? 'var(--primary)' : 'transparent'}; position: relative; transition: background 0.2s;"
+          style="border-color: ${isToday ? 'var(--primary)' : 'transparent'};"
           ondrop="handleScheduleDrop(event)"
           ondragover="event.preventDefault(); event.currentTarget.style.background = 'rgba(182, 109, 255, 0.1)';"
           ondragleave="event.currentTarget.style.background = 'var(--card-bg)';"
         >
-            <div style="font-weight: 600; margin-bottom: 0.5rem; color: ${isToday ? 'var(--primary)' : 'var(--text-primary)'};">${day}</div>
+            <div class="calendar-day-header-wrapper" style="font-weight: 600; margin-bottom: 0.5rem; color: ${isToday ? 'var(--primary)' : 'var(--text-primary)'};">
+              <span class="mobile-day-label">${dayOfWeek}</span>
+              ${day}
+            </div>
             <div class="schedule-events">
               ${events.map(event => `
                 <div 
@@ -186,10 +191,10 @@ function renderScheduleCalendar() {
                   draggable="true"
                   ondragstart="handleScheduledEventDragStart(event, '${dateKey}', '${event.id}')"
                   onclick="editScheduleEvent('${dateKey}', '${event.id}')"
-                  style="background: rgba(182, 109, 255, 0.2); border-left: 3px solid var(--primary); padding: 0.25rem 0.5rem; margin-bottom: 0.25rem; border-radius: 4px; font-size: 0.75rem; cursor: grab; position: relative;"
+                  style="background: rgba(182, 109, 255, 0.2); border-left: 3px solid var(--primary); padding: 0.25rem 0.5rem; margin-bottom: 0.25rem; border-radius: 4px; font-size: 0.75rem; cursor: grab;"
                   title="${event.title}"
                 >
-                  <div style="font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${event.title}</div>
+                  <div style="font-weight: 600;" class="schedule-event-content">${event.title}</div>
                   ${event.startTime ? `<div style="color: var(--text-secondary); font-size: 0.7rem;">${event.startTime} - ${event.endTime}</div>` : ''}
                 </div>
               `).join('')}
