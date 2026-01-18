@@ -817,15 +817,94 @@
             flex: 1;
         }
 
+        /* Schedule Page Layout */
+        .schedule-container {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        /* Calendar Grid */
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 1px;
+            background: var(--border-color);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .calendar-header-cell {
+            background: var(--card-bg);
+            padding: 0.75rem;
+            text-align: center;
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+
+        .calendar-day {
+            background: var(--card-bg);
+            min-height: 120px;
+            padding: 0.5rem;
+            cursor: pointer;
+            border: 2px solid transparent;
+            position: relative;
+            transition: background 0.2s;
+            min-width: 0; /* Fix grid overflow */
+        }
+
+        .mobile-day-label {
+            display: none;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-right: 0.5rem;
+        }
+
+        /* Event Truncation & Fade */
+        .schedule-event {
+            position: relative;
+            overflow: hidden;
+            white-space: nowrap;
+            /* Fade effect for right side */
+            mask-image: linear-gradient(to right, black 85%, transparent 100%);
+            -webkit-mask-image: linear-gradient(to right, black 85%, transparent 100%);
+        }
+
         @media (max-width: 991px) {
-            #schedulePage > div:first-of-type {
-                grid-template-columns: 1fr !important;
+            .schedule-container {
+                grid-template-columns: 1fr;
             }
             
-            #schedulePage .card:first-child {
+            #unscheduledCard {
                 max-height: 400px;
             }
         }
+
+        @media (max-width: 768px) {
+            .calendar-grid {
+                grid-template-columns: 1fr;
+            }
+            .calendar-header-cell {
+                display: none;
+            }
+            .calendar-day {
+                min-height: auto;
+                border-bottom: 1px solid var(--border-color);
+                display: flex;
+                flex-direction: column;
+            }
+            .calendar-day-header-wrapper {
+                display: flex;
+                align-items: center;
+                margin-bottom: 0.5rem;
+            }
+            .mobile-day-label {
+                display: inline-block;
+            }
+        }
+
         @media (max-width: 991px) {
             .sidebar {
                 transform: translateX(-100%);
@@ -1147,7 +1226,7 @@
                         <p style="color: var(--text-secondary);">Drag assignments to schedule them, then export to your calendar app</p>
                     </div>
 
-                    <div style="display: grid; grid-template-columns: 300px 1fr; gap: 1.5rem; margin-bottom: 1.5rem;">
+                    <div class="schedule-container">
                         <!-- Unscheduled Assignments Sidebar -->
                         <div class="card" id="unscheduledCard">
                             <div class="card-title" id="unscheduledHeader">
