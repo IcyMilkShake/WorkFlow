@@ -2,7 +2,7 @@
 // ==========================================
 // CONFIGURATION & UTILS
 // ==========================================
-const USE_MOCK_DATA = true;
+const USE_MOCK_DATA = false;
 const GOOGLE_CLIENT_ID = '204169741443-lrnat59d7ob8ae63srsbg2ojefn1f51h.apps.googleusercontent.com';
 const GOOGLE_SCOPES = 'https://www.googleapis.com/auth/classroom.courses.readonly https://www.googleapis.com/auth/classroom.coursework.me.readonly https://www.googleapis.com/auth/userinfo.profile';
 
@@ -46,7 +46,6 @@ let completionHistory = JSON.parse(localStorage.getItem('completionHistory') || 
 let scheduleEvents = JSON.parse(localStorage.getItem('scheduleEvents') || '{}');
 let isLoading = false;
 let conversationHistory = [];
-let currentPage = localStorage.getItem('lastPage') || 'assignments';
 
 let statusChartInstance = null;
 let courseChartInstance = null;
@@ -1460,18 +1459,13 @@ async function loadAssignments() {
   } finally {
     isLoading = false;
     loadingMsg.style.display = 'none';
-    updateCurrentPageView();
+    updateAIViewIfActive();
   }
 }
 
-function updateCurrentPageView() {
-  if (currentPage === 'statistics') generateStatistics();
-  if (currentPage === 'schedule') {
-      renderScheduleCalendar();
-      renderUnscheduledAssignments();
-  }
-  if (currentPage === 'courses') displayCourses();
-  if (currentPage === 'aiAssistant') initAIAssistant();
+function updateAIViewIfActive() {
+  const aiPage = byId('aiAssistantPage');
+  if (aiPage.style.display !== 'none') initAIAssistant();
 }
 
 function updateStats(assignments) {
@@ -1563,14 +1557,11 @@ function formatDueDate(assignment) {
 // UI FUNCTIONS
 // ==========================================
 window.showPage = function(page) {
-  currentPage = page;
-  localStorage.setItem('lastPage', page);
-
   qsa('.sidebar-menu-item').forEach(item => item.classList.remove('active'));
-  
-  // Programmatically set active class if no event (e.g. page load)
-  const activeLink = qs(`.sidebar-menu-item[onclick="showPage('${page}')"]`);
-  if (activeLink) activeLink.classList.add('active');
+  if (typeof event !== 'undefined' && event.target && event.target.closest) {
+    const item = event.target.closest('.sidebar-menu-item');
+    if (item) item.classList.add('active');
+  }
 
   const pages = ['assignments', 'statistics', 'aiAssistant', 'schedule', 'courses', 'settings', 'help'];
   pages.forEach(p => {
@@ -1719,7 +1710,6 @@ function changeTheme(theme) {
 function showDashboard() {
   byId('loginPage').style.display = 'none';
   byId('dashboardPage').style.display = 'block';
-  showPage(currentPage);
 }
 
 function showLoginScreen() {
