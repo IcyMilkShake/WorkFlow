@@ -43,7 +43,13 @@ let ignoredCourses = new Set(JSON.parse(localStorage.getItem('ignoredCourses') |
 let currentTheme = localStorage.getItem('theme') || 'dark';
 let previousAssignmentStates = JSON.parse(localStorage.getItem('previousStates') || '{}');
 let completionHistory = JSON.parse(localStorage.getItem('completionHistory') || '{}');
-let scheduleEvents = JSON.parse(localStorage.getItem('scheduleEvents') || '{}');
+let scheduleEvents = {};
+try {
+  scheduleEvents = JSON.parse(localStorage.getItem('scheduleEvents') || '{}');
+} catch (e) {
+  console.error('Failed to parse scheduleEvents, resetting.', e);
+  scheduleEvents = {};
+}
 let isLoading = false;
 let conversationHistory = [];
 
@@ -72,131 +78,141 @@ if ('serviceWorker' in navigator) {
 // ==========================================
 window.showScheduleEditor = function() {
   showPage('schedule');
-  renderScheduleCalendar();
-  renderUnscheduledAssignments();
 }
 
 function renderScheduleCalendar() {
-  const container = byId('scheduleCalendar');
-  if (!container) return;
+  try {
+    const container = byId('scheduleCalendar');
+    if (!container) return;
 
-  const year = currentScheduleDate.getFullYear();
-  const month = currentScheduleDate.getMonth();
-  
-  const firstDay = new Date(year, month, 1);
-  const lastDay = new Date(year, month + 1, 0);
-  const daysInMonth = lastDay.getDate();
-  const startingDayOfWeek = firstDay.getDay();
+    const year = currentScheduleDate.getFullYear();
+    const month = currentScheduleDate.getMonth();
 
-  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'];
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const daysInMonth = lastDay.getDate();
+    const startingDayOfWeek = firstDay.getDay();
 
-  container.innerHTML = `
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-      <button class="btn btn-primary" onclick="changeScheduleMonth(-1)" style="padding: 0.5rem 1rem;">
-        <i class="ph ph-caret-left"></i>
-      </button>
-      <h3 style="margin: 0;">${monthNames[month]} ${year}</h3>
-      <button class="btn btn-primary" onclick="changeScheduleMonth(1)" style="padding: 0.5rem 1rem;">
-        <i class="ph ph-caret-right"></i>
-      </button>
-    </div>
-    
-    <div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; background: var(--border-color); border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden;">
-      ${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => 
-        `<div style="background: var(--card-bg); padding: 0.75rem; text-align: center; font-weight: 600; color: var(--text-secondary);">${day}</div>`
-      ).join('')}
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'];
+
+    container.innerHTML = `
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+        <button class="btn btn-primary" onclick="changeScheduleMonth(-1)" style="padding: 0.5rem 1rem;">
+          <i class="ph ph-caret-left"></i>
+        </button>
+        <h3 style="margin: 0;">${monthNames[month]} ${year}</h3>
+        <button class="btn btn-primary" onclick="changeScheduleMonth(1)" style="padding: 0.5rem 1rem;">
+          <i class="ph ph-caret-right"></i>
+        </button>
+      </div>
       
-      ${Array(startingDayOfWeek).fill(null).map(() => 
-        `<div style="background: var(--dark); min-height: 120px;"></div>`
-      ).join('')}
-      
-      ${Array.from({length: daysInMonth}, (_, i) => {
-        const day = i + 1;
-        const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-        const events = scheduleEvents[dateKey] || [];
-        const isToday = new Date().toDateString() === new Date(year, month, day).toDateString();
+      <div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; background: var(--border-color); border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden;">
+        ${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day =>
+          `<div style="background: var(--card-bg); padding: 0.75rem; text-align: center; font-weight: 600; color: var(--text-secondary);">${day}</div>`
+        ).join('')}
         
+        ${Array(startingDayOfWeek).fill(null).map(() =>
+          `<div style="background: var(--dark); min-height: 120px;"></div>`
+        ).join('')}
+
+        ${Array.from({length: daysInMonth}, (_, i) => {
+          const day = i + 1;
+          const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+          const events = Array.isArray(scheduleEvents[dateKey]) ? scheduleEvents[dateKey] : [];
+          const isToday = new Date().toDateString() === new Date(year, month, day).toDateString();
+
+          return `
+            <div
+              class="calendar-day"
+              data-date="${dateKey}"
+              style="background: var(--card-bg); min-height: 120px; padding: 0.5rem; cursor: pointer; border: 2px solid ${isToday ? 'var(--primary)' : 'transparent'}; position: relative;"
+              ondrop="handleScheduleDrop(event)"
+              ondragover="event.preventDefault()"
+            >
+              <div style="font-weight: 600; margin-bottom: 0.5rem; color: ${isToday ? 'var(--primary)' : 'var(--text-primary)'};">${day}</div>
+              <div class="schedule-events">
+                ${events.map(event => `
+                  <div
+                    class="schedule-event"
+                    onclick="editScheduleEvent('${dateKey}', '${event.id}')"
+                    style="background: rgba(182, 109, 255, 0.2); border-left: 3px solid var(--primary); padding: 0.25rem 0.5rem; margin-bottom: 0.25rem; border-radius: 4px; font-size: 0.75rem; cursor: pointer; position: relative;"
+                    title="${event.title}"
+                  >
+                    <div style="font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${event.title}</div>
+                    ${event.startTime ? `<div style="color: var(--text-secondary); font-size: 0.7rem;">${event.startTime} - ${event.endTime}</div>` : ''}
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+  } catch (error) {
+    console.error('Error rendering schedule calendar:', error);
+    showToast('❌ Error loading calendar');
+  }
+}
+
+function renderUnscheduledAssignments() {
+  try {
+    const container = byId('unscheduledList');
+    if (!container) return;
+
+    const scheduled = new Set();
+    // Safely iterate over values, ensuring they are arrays
+    Object.values(scheduleEvents).forEach(dayEvents => {
+      if (Array.isArray(dayEvents)) {
+        dayEvents.forEach(event => {
+          if (event.assignmentId) scheduled.add(event.assignmentId);
+        });
+      }
+    });
+
+    const filtered = allAssignmentsData.filter(a =>
+      !ignoredCourses.has(a.courseName) &&
+      a.status !== 'submitted' &&
+      !scheduled.has(a.title + '_' + a.courseName)
+    );
+
+    if (filtered.length === 0) {
+      container.innerHTML = `
+        <div class="empty-state" style="padding: 2rem;">
+          <div class="empty-state-icon"><i class="ph ph-check-circle"></i></div>
+          <h4>All scheduled!</h4>
+          <p style="font-size: 0.875rem;">All assignments have been added to your calendar.</p>
+        </div>`;
+      return;
+    }
+
+    container.innerHTML = `
+      <div style="margin-bottom: 1rem;">
+        <button class="btn btn-primary" onclick="autoScheduleAll()" style="width: 100%;">
+          <i class="ph ph-magic-wand"></i> Auto-Schedule All
+        </button>
+      </div>
+      ${filtered.map(assignment => {
+        const dueDate = formatDueDate(assignment);
         return `
-          <div 
-            class="calendar-day" 
-            data-date="${dateKey}"
-            style="background: var(--card-bg); min-height: 120px; padding: 0.5rem; cursor: pointer; border: 2px solid ${isToday ? 'var(--primary)' : 'transparent'}; position: relative;"
-            ondrop="handleScheduleDrop(event)"
-            ondragover="event.preventDefault()"
+          <div
+            class="unscheduled-assignment"
+            draggable="true"
+            ondragstart="handleAssignmentDragStart(event, ${JSON.stringify(assignment).replace(/"/g, '&quot;')})"
+            style="background: var(--card-bg); border: 1px solid var(--border-color); border-left: 3px solid ${assignment.status === 'late' ? 'var(--danger)' : 'var(--warning)'}; padding: 1rem; margin-bottom: 0.75rem; border-radius: 8px; cursor: grab;"
           >
-            <div style="font-weight: 600; margin-bottom: 0.5rem; color: ${isToday ? 'var(--primary)' : 'var(--text-primary)'};">${day}</div>
-            <div class="schedule-events">
-              ${events.map(event => `
-                <div 
-                  class="schedule-event" 
-                  onclick="editScheduleEvent('${dateKey}', '${event.id}')"
-                  style="background: rgba(182, 109, 255, 0.2); border-left: 3px solid var(--primary); padding: 0.25rem 0.5rem; margin-bottom: 0.25rem; border-radius: 4px; font-size: 0.75rem; cursor: pointer; position: relative;"
-                  title="${event.title}"
-                >
-                  <div style="font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${event.title}</div>
-                  ${event.startTime ? `<div style="color: var(--text-secondary); font-size: 0.7rem;">${event.startTime} - ${event.endTime}</div>` : ''}
-                </div>
-              `).join('')}
+            <div style="font-weight: 600; margin-bottom: 0.25rem;">${assignment.title}</div>
+            <div style="font-size: 0.875rem; color: var(--text-secondary);">${assignment.courseName}</div>
+            <div style="font-size: 0.75rem; color: ${assignment.status === 'late' ? 'var(--danger)' : 'var(--warning)'}; margin-top: 0.5rem;">
+              <i class="ph ph-calendar"></i> ${dueDate}
             </div>
           </div>
         `;
       }).join('')}
-    </div>
-  `;
-}
-
-function renderUnscheduledAssignments() {
-  const container = byId('unscheduledList');
-  if (!container) return;
-
-  const scheduled = new Set();
-  Object.values(scheduleEvents).forEach(dayEvents => {
-    dayEvents.forEach(event => {
-      if (event.assignmentId) scheduled.add(event.assignmentId);
-    });
-  });
-
-  const filtered = allAssignmentsData.filter(a => 
-    !ignoredCourses.has(a.courseName) && 
-    a.status !== 'submitted' &&
-    !scheduled.has(a.title + '_' + a.courseName)
-  );
-
-  if (filtered.length === 0) {
-    container.innerHTML = `
-      <div class="empty-state" style="padding: 2rem;">
-        <div class="empty-state-icon"><i class="ph ph-check-circle"></i></div>
-        <h4>All scheduled!</h4>
-        <p style="font-size: 0.875rem;">All assignments have been added to your calendar.</p>
-      </div>`;
-    return;
+    `;
+  } catch (error) {
+    console.error('Error rendering unscheduled assignments:', error);
   }
-
-  container.innerHTML = `
-    <div style="margin-bottom: 1rem;">
-      <button class="btn btn-primary" onclick="autoScheduleAll()" style="width: 100%;">
-        <i class="ph ph-magic-wand"></i> Auto-Schedule All
-      </button>
-    </div>
-    ${filtered.map(assignment => {
-      const dueDate = formatDueDate(assignment);
-      return `
-        <div 
-          class="unscheduled-assignment"
-          draggable="true"
-          ondragstart="handleAssignmentDragStart(event, ${JSON.stringify(assignment).replace(/"/g, '&quot;')})"
-          style="background: var(--card-bg); border: 1px solid var(--border-color); border-left: 3px solid ${assignment.status === 'late' ? 'var(--danger)' : 'var(--warning)'}; padding: 1rem; margin-bottom: 0.75rem; border-radius: 8px; cursor: grab;"
-        >
-          <div style="font-weight: 600; margin-bottom: 0.25rem;">${assignment.title}</div>
-          <div style="font-size: 0.875rem; color: var(--text-secondary);">${assignment.courseName}</div>
-          <div style="font-size: 0.75rem; color: ${assignment.status === 'late' ? 'var(--danger)' : 'var(--warning)'}; margin-top: 0.5rem;">
-            <i class="ph ph-calendar"></i> ${dueDate}
-          </div>
-        </div>
-      `;
-    }).join('')}
-  `;
 }
 
 window.handleAssignmentDragStart = function(event, assignment) {
@@ -1427,8 +1443,6 @@ async function loadAssignments() {
     // Calculate cutoff: 365 days ago
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const oneYearAgo = new Date();
-    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
 
     const allAssignments = [];
 
@@ -1457,8 +1471,9 @@ async function loadAssignments() {
           const dueDate = new Date(work.dueDate.year, work.dueDate.month - 1, work.dueDate.day);
           const daysSinceDue = Math.floor((today - dueDate) / (1000 * 60 * 60 * 24));
           
-          // Skip if older than 1 year OR overdue by 365+ days
-          return dueDate >= oneYearAgo && daysSinceDue < 365;
+          // Keep if NOT overdue by 365 days or more (i.e. daysSinceDue < 365)
+          // Note: daysSinceDue is positive if overdue
+          return daysSinceDue < 365;
         });
         
         // Process submissions in small batches with delays
