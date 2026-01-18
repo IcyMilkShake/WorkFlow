@@ -9,6 +9,26 @@ const byId = (id) => document.getElementById(id);
 const qs = (selector) => document.querySelector(selector);
 const qsa = (selector) => document.querySelectorAll(selector);
 
+// Retry fetch with backoff for 429 errors
+async function fetchWithBackoff(url, options, retries = 3, backoff = 1000) {
+  try {
+    const response = await fetch(url, options);
+    if (response.status === 429 && retries > 0) {
+      console.warn(`429 Rate Limited. Retrying in ${backoff}ms...`);
+      await new Promise(r => setTimeout(r, backoff));
+      return fetchWithBackoff(url, options, retries - 1, backoff * 2);
+    }
+    return response;
+  } catch (error) {
+    if (retries > 0) {
+      console.warn(`Fetch error. Retrying in ${backoff}ms...`, error);
+      await new Promise(r => setTimeout(r, backoff));
+      return fetchWithBackoff(url, options, retries - 1, backoff * 2);
+    }
+    throw error;
+  }
+}
+
 // ==========================================
 // STATE MANAGEMENT
 // ==========================================
@@ -1030,81 +1050,91 @@ async function loadAssignments() {
     const oneYearAgo = new Date();
     oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
 
-    // Fetch assignments for all courses in parallel
-    const coursesPromises = courses.map(async (course) => {
-      try {
-        const courseworkResponse = await fetch(
-          `https://classroom.googleapis.com/v1/courses/${course.id}/courseWork`,
-          { headers: { 'Authorization': `Bearer ${googleAccessToken}` }}
-        );
+    // Chunk courses to process in groups of 3 to avoid 429 Rate Limit errors
+    const COURSE_CHUNK_SIZE = 3;
+    const results = [];
 
-        if (!courseworkResponse.ok) return [];
+    for (let i = 0; i < courses.length; i += COURSE_CHUNK_SIZE) {
+      const chunk = courses.slice(i, i + COURSE_CHUNK_SIZE);
+      const chunkPromises = chunk.map(async (course) => {
+        try {
+          // Add backoff retry for fetching coursework list
+          const courseworkResponse = await fetchWithBackoff(
+            `https://classroom.googleapis.com/v1/courses/${course.id}/courseWork`,
+            { headers: { 'Authorization': `Bearer ${googleAccessToken}` }}
+          );
 
-        const courseworkData = await courseworkResponse.json();
-        let coursework = courseworkData.courseWork || [];
+          if (!courseworkResponse.ok) return [];
 
-        // Filter: Skip assignments due more than 1 year ago
-        coursework = coursework.filter(work => {
-          const date = parseGoogleDate(work.dueDate);
-          if (!date) return true; // Keep if no due date
-          return date >= oneYearAgo;
-        });
-        
-        const courseAssignments = [];
-        const BATCH_SIZE = 5;
+          const courseworkData = await courseworkResponse.json();
+          let coursework = courseworkData.courseWork || [];
 
-        for (let i = 0; i < coursework.length; i += BATCH_SIZE) {
-          const batch = coursework.slice(i, i + BATCH_SIZE);
-          const assignmentPromises = batch.map(async (work) => {
-            try {
-              const submissionResponse = await fetch(
-                `https://classroom.googleapis.com/v1/courses/${course.id}/courseWork/${work.id}/studentSubmissions`,
-                { headers: { 'Authorization': `Bearer ${googleAccessToken}` }}
-              );
-
-              let status = 'pending';
-              let completionTime = null;
-
-              if (submissionResponse.ok) {
-                const submissionData = await submissionResponse.json();
-                const submission = submissionData.studentSubmissions?.[0];
-                if (submission) {
-                  const isSubmitted = submission.state === 'TURNED_IN' || submission.state === 'RETURNED';
-                  status = isSubmitted ? 'submitted' : submission.late ? 'late' : 'pending';
-                  if (isSubmitted) completionTime = submission.updateTime;
-                }
-              }
-
-              return {
-                source: 'google',
-                title: work.title,
-                courseName: course.name,
-                description: work.description,
-                maxPoints: work.maxPoints,
-                dueDate: work.dueDate,
-                dueTime: work.dueTime,
-                status: status,
-                link: work.alternateLink,
-                completionTime: completionTime
-              };
-            } catch (error) {
-              console.error(`Error loading submission:`, error);
-              return null;
-            }
+          // Filter: Skip assignments due more than 1 year ago
+          coursework = coursework.filter(work => {
+            const date = parseGoogleDate(work.dueDate);
+            if (!date) return true; // Keep if no due date
+            return date >= oneYearAgo;
           });
-          
-          const batchResults = await Promise.all(assignmentPromises);
-          courseAssignments.push(...batchResults.filter(a => a !== null));
+
+          const courseAssignments = [];
+          const BATCH_SIZE = 5;
+
+          for (let j = 0; j < coursework.length; j += BATCH_SIZE) {
+            const batch = coursework.slice(j, j + BATCH_SIZE);
+            const assignmentPromises = batch.map(async (work) => {
+              try {
+                // Add backoff retry for fetching submission status
+                const submissionResponse = await fetchWithBackoff(
+                  `https://classroom.googleapis.com/v1/courses/${course.id}/courseWork/${work.id}/studentSubmissions`,
+                  { headers: { 'Authorization': `Bearer ${googleAccessToken}` }}
+                );
+
+                let status = 'pending';
+                let completionTime = null;
+
+                if (submissionResponse.ok) {
+                  const submissionData = await submissionResponse.json();
+                  const submission = submissionData.studentSubmissions?.[0];
+                  if (submission) {
+                    const isSubmitted = submission.state === 'TURNED_IN' || submission.state === 'RETURNED';
+                    status = isSubmitted ? 'submitted' : submission.late ? 'late' : 'pending';
+                    if (isSubmitted) completionTime = submission.updateTime;
+                  }
+                }
+
+                return {
+                  source: 'google',
+                  title: work.title,
+                  courseName: course.name,
+                  description: work.description,
+                  maxPoints: work.maxPoints,
+                  dueDate: work.dueDate,
+                  dueTime: work.dueTime,
+                  status: status,
+                  link: work.alternateLink,
+                  completionTime: completionTime
+                };
+              } catch (error) {
+                console.error(`Error loading submission:`, error);
+                return null;
+              }
+            });
+
+            const batchResults = await Promise.all(assignmentPromises);
+            courseAssignments.push(...batchResults.filter(a => a !== null));
+          }
+          return courseAssignments;
+
+        } catch (error) {
+          console.error(`Error loading coursework for ${course.name}:`, error);
+          return [];
         }
-        return courseAssignments;
+      });
 
-      } catch (error) {
-        console.error(`Error loading coursework for ${course.name}:`, error);
-        return [];
-      }
-    });
+      const chunkResults = await Promise.all(chunkPromises);
+      results.push(...chunkResults);
+    }
 
-    const results = await Promise.all(coursesPromises);
     allAssignmentsData = results.flat();
     recalculateProductivityFromHistory(allAssignmentsData);
     displayAssignments(allAssignmentsData);
