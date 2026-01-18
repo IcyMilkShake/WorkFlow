@@ -760,13 +760,51 @@
             background: rgba(182, 109, 255, 0.3) !important;
         }
 
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: var(--darker);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-secondary);
+        }
+
+        /* Schedule Card Layout */
+        #unscheduledCard {
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            max-height: 600px;
+            overflow: hidden;
+        }
+        #unscheduledHeader {
+            padding: 1.5rem;
+            background: var(--card-bg);
+            border-bottom: 1px solid var(--border-color);
+            flex-shrink: 0;
+            z-index: 10;
+        }
+        #unscheduledList {
+            padding: 1.5rem;
+            overflow-y: auto;
+            flex: 1;
+        }
+
         @media (max-width: 991px) {
             #schedulePage > div:first-of-type {
                 grid-template-columns: 1fr !important;
             }
             
             #schedulePage .card:first-child {
-                max-height: 300px;
+                max-height: 400px;
             }
         }
         @media (max-width: 991px) {
@@ -1092,10 +1130,12 @@
 
                     <div style="display: grid; grid-template-columns: 300px 1fr; gap: 1.5rem; margin-bottom: 1.5rem;">
                         <!-- Unscheduled Assignments Sidebar -->
-                        <div class="card" style="max-height: 600px; overflow-y: auto;">
-                            <div class="card-title" style="position: sticky; top: 0; background: var(--card-bg); z-index: 10; padding-bottom: 1rem;">
-                                <i class="ph ph-list" style="margin-right: 0.5rem;"></i>
-                                Pending Assignments
+                        <div class="card" id="unscheduledCard">
+                            <div class="card-title" id="unscheduledHeader">
+                                <div style="display: flex; align-items: center;">
+                                    <i class="ph ph-list" style="margin-right: 0.5rem;"></i>
+                                    Pending Assignments
+                                </div>
                             </div>
                             <div id="unscheduledList"></div>
                         </div>
