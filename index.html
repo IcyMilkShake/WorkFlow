@@ -1093,9 +1093,11 @@
                     <div style="display: grid; grid-template-columns: 300px 1fr; gap: 1.5rem; margin-bottom: 1.5rem;">
                         <!-- Unscheduled Assignments Sidebar -->
                         <div class="card" style="max-height: 600px; overflow-y: auto;">
-                            <div class="card-title" style="position: sticky; top: 0; background: var(--card-bg); z-index: 10; padding-bottom: 1rem;">
-                                <i class="ph ph-list" style="margin-right: 0.5rem;"></i>
-                                Pending Assignments
+                            <div class="card-title" id="unscheduledHeader" style="position: sticky; top: 0; background: var(--card-bg); z-index: 10; padding-bottom: 1rem; display: flex; flex-direction: column; gap: 0.5rem;">
+                                <div style="display: flex; align-items: center;">
+                                    <i class="ph ph-list" style="margin-right: 0.5rem;"></i>
+                                    Pending Assignments
+                                </div>
                             </div>
                             <div id="unscheduledList"></div>
                         </div>

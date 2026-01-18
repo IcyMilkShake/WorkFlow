@@ -60,9 +60,6 @@ let draggedAssignment = null;
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/service-worker.js')
-      .then((registration) => {
-        setInterval(() => registration.update(), 60000);
-      })
       .catch((error) => console.error('Service Worker registration failed:', error));
   });
 }
@@ -148,7 +145,9 @@ function renderScheduleCalendar() {
 
 function renderUnscheduledAssignments() {
   const container = byId('unscheduledList');
-  if (!container) return;
+  const header = byId('unscheduledHeader');
+
+  if (!container || !header) return;
 
   const scheduled = new Set();
   Object.values(scheduleEvents).forEach(dayEvents => {
@@ -163,6 +162,10 @@ function renderUnscheduledAssignments() {
     !scheduled.has(a.title + '_' + a.courseName)
   );
 
+  // Clean up previous button if exists
+  const existingBtn = header.querySelector('#autoScheduleBtn');
+  if (existingBtn) existingBtn.remove();
+
   if (filtered.length === 0) {
     container.innerHTML = `
       <div class="empty-state" style="padding: 2rem;">
@@ -173,13 +176,18 @@ function renderUnscheduledAssignments() {
     return;
   }
 
-  container.innerHTML = `
-    <div style="margin-bottom: 1rem;">
-      <button class="btn btn-primary" onclick="autoScheduleAll()" style="width: 100%;">
-        <i class="ph ph-magic-wand"></i> Auto-Schedule All
-      </button>
-    </div>
-    ${filtered.map(assignment => {
+  // Inject button into sticky header
+  const btnDiv = document.createElement('div');
+  btnDiv.id = 'autoScheduleBtn';
+  btnDiv.style.width = '100%';
+  btnDiv.innerHTML = `
+    <button class="btn btn-primary" onclick="autoScheduleAll()" style="width: 100%; padding: 0.5rem;">
+      <i class="ph ph-magic-wand"></i> Auto-Schedule All
+    </button>
+  `;
+  header.appendChild(btnDiv);
+
+  container.innerHTML = filtered.map(assignment => {
       const dueDate = formatDueDate(assignment);
       return `
         <div 
@@ -195,8 +203,7 @@ function renderUnscheduledAssignments() {
           </div>
         </div>
       `;
-    }).join('')}
-  `;
+    }).join('');
 }
 
 window.handleAssignmentDragStart = function(event, assignment) {
@@ -568,92 +575,6 @@ function urlBase64ToUint8Array(base64String) {
   return outputArray;
 }
 
-function scheduleNotificationChecks() {
-  checkAndSendNotifications();
-  setInterval(checkAndSendNotifications, 60 * 60 * 1000);
-}
-
-function scheduleNotificationChecks() {
-  // Local checks (deprecated in favor of server push, but kept for fallback)
-  checkAndSendNotifications();
-  setInterval(checkAndSendNotifications, 60 * 60 * 1000);
-}
-
-function checkAndSendNotifications() {
-  if (Notification.permission !== 'granted') return;
-  if (localStorage.getItem('notificationsEnabled') !== 'true') return;
-  
-  const now = new Date();
-  const filteredAssignments = allAssignmentsData.filter(a => !ignoredCourses.has(a.courseName));
-  
-  filteredAssignments.forEach(assignment => {
-    if (!assignment.dueDate) return;
-    
-    const dueDate = new Date(assignment.dueDate.year, assignment.dueDate.month - 1, assignment.dueDate.day);
-    const diffTime = dueDate - now;
-    const daysUntilDue = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
-    if (daysUntilDue < 0 && assignment.status === 'late') {
-      sendNotification(assignment, 'overdue', Math.abs(daysUntilDue));
-    } else if (daysUntilDue === 1 && assignment.status === 'pending') {
-      sendNotification(assignment, 'dueTomorrow', daysUntilDue);
-    } else if (daysUntilDue >= 2 && daysUntilDue <= 7 && assignment.status === 'pending') {
-      const count = getNotificationCount(assignment.title, 'dueSoonRandom');
-      if (count < 2 && Math.random() < 0.1) {
-        sendNotification(assignment, 'dueSoonRandom', daysUntilDue);
-      }
-    }
-  });
-}
-
-function sendNotification(assignment, type, days) {
-  if (!shouldShowNotification(assignment.title, type)) return;
-  
-  const messages = COMEDIC_MESSAGES[type];
-  const message = messages[Math.floor(Math.random() * messages.length)]
-    .replace('{title}', assignment.title)
-    .replace('{days}', days);
-  
-  const titles = {
-    dueTomorrow: '⏰ Due Tomorrow!',
-    overdue: '🚨 Assignment Overdue!',
-    dueSoonRandom: '📅 Assignment Reminder'
-  };
-
-  new Notification(titles[type], {
-    body: message,
-    icon: '/icons/icon-192x192.png',
-    tag: `${type}-${assignment.title}`,
-    requireInteraction: type === 'overdue'
-  });
-  
-  recordNotification(assignment.title, type);
-  if (type === 'dueSoonRandom') {
-    incrementNotificationCount(assignment.title, type);
-  }
-}
-
-function shouldShowNotification(assignmentTitle, type) {
-  const key = `notif_time_${assignmentTitle}_${type}`;
-  const lastShown = localStorage.getItem(key);
-  if (!lastShown) return true;
-  const hoursSinceLastShown = (Date.now() - parseInt(lastShown)) / (1000 * 60 * 60);
-  return hoursSinceLastShown >= 24;
-}
-
-function recordNotification(assignmentTitle, type) {
-  localStorage.setItem(`notif_time_${assignmentTitle}_${type}`, Date.now().toString());
-}
-
-function getNotificationCount(assignmentTitle, type) {
-  return parseInt(localStorage.getItem(`notif_count_${assignmentTitle}_${type}`) || '0');
-}
-
-function incrementNotificationCount(assignmentTitle, type) {
-  const key = `notif_count_${assignmentTitle}_${type}`;
-  const count = getNotificationCount(assignmentTitle, type);
-  localStorage.setItem(key, (count + 1).toString());
-}
 
 // ==========================================
 // PRODUCTIVITY TRACKING
@@ -1722,6 +1643,11 @@ window.toggleCourse = function(courseName, isEnabled) {
   displayAssignments(allAssignmentsData);
   updateStats(allAssignmentsData);
   displayCourses();
+
+  // Update server immediately to stop notifications for ignored courses
+  if (localStorage.getItem('notificationsEnabled') === 'true') {
+    syncWithServer();
+  }
 }
 
 function initializeSettings() {
@@ -1746,7 +1672,7 @@ window.toggleNotifications = async function(enabled) {
     if (Notification.permission === 'granted') {
       localStorage.setItem('notificationsEnabled', 'true');
       showToast('🔔 Notifications enabled');
-      scheduleNotificationChecks();
+      await subscribeToPush(); // Ensure we are subscribed and synced
     } else {
       toggle.checked = false; 
       const permission = await Notification.requestPermission();
@@ -1754,7 +1680,7 @@ window.toggleNotifications = async function(enabled) {
         localStorage.setItem('notificationsEnabled', 'true');
         toggle.checked = true;
         showToast('🎉 Notifications enabled!');
-        scheduleNotificationChecks();
+        await subscribeToPush();
         byId('notificationPermission').style.display = 'none';
       } else {
         showToast('❌ Permission denied. Please enable in browser settings.');
