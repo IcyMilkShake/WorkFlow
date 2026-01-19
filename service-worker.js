@@ -1,4 +1,4 @@
-const CACHE_VERSION = '2.0.4'; // INCREMENT THIS ON EVERY DEPLOY
+const CACHE_VERSION = '2.0.5'; // INCREMENT THIS ON EVERY DEPLOY
 const CACHE_NAME = `workflow-v${CACHE_VERSION}`;
 const RUNTIME_CACHE = `workflow-runtime-v${CACHE_VERSION}`;
 
@@ -87,8 +87,25 @@ self.addEventListener('fetch', (event) => {
         })
         .catch(() => {
           // Fallback to cache if offline
-          return caches.match(event.request)
-            .then(cached => cached || caches.match('/offline.html'));
+          return caches.match(event.request, { ignoreSearch: true })
+            .then(cached => {
+              // If found in cache, return it
+              if (cached) return cached;
+
+              // If not, try offline.html
+              return caches.match('/offline.html').then(offline => {
+                 if (offline) return offline;
+
+                 // Absolute fallback for Safari to prevent "Cannot Connect" errors
+                 return new Response(
+                   '<body style="font-family:sans-serif; text-align:center; padding:2rem;"><h1>You are offline</h1><p>Please check your connection.</p></body>',
+                   {
+                     status: 200,
+                     headers: { 'Content-Type': 'text/html' }
+                   }
+                 );
+              });
+            });
         })
     );
     return;
@@ -96,7 +113,7 @@ self.addEventListener('fetch', (event) => {
 
   // Cache First for static assets (CSS, images, fonts)
   event.respondWith(
-    caches.match(event.request)
+    caches.match(event.request, { ignoreSearch: true })
       .then((cachedResponse) => {
         if (cachedResponse) return cachedResponse;
         
@@ -109,6 +126,12 @@ self.addEventListener('fetch', (event) => {
               });
             }
             return response;
+          })
+          .catch(err => {
+             // Optional: Return a placeholder image if it's an image request
+             console.log('Fetch failed for asset:', event.request.url);
+             // Return nothing to let the browser handle the failure (broken image icon)
+             // or return new Response('', { status: 404 }) to suppress network error logging
           });
       })
   );
