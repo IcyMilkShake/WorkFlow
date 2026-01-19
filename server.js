@@ -188,11 +188,13 @@ app.post('/api/subscribe', (req, res) => {
   // Check for account switch
   let lastNotified = existingUser.lastNotified || {};
   let notificationQueue = existingUser.notificationQueue || [];
+  let lastQueueProcessingTime = existingUser.lastQueueProcessingTime || 0;
   
   if (userId && existingUser.userId && existingUser.userId !== userId) {
       console.log(`🔄 Account switch detected for ${clientId}. Clearing queue.`);
       lastNotified = {};
       notificationQueue = [];
+      lastQueueProcessingTime = 0;
   }
 
   subscriptions[clientId] = {
@@ -200,6 +202,7 @@ app.post('/api/subscribe', (req, res) => {
     assignments: assignments || existingUser.assignments || [],
     lastNotified: lastNotified,
     notificationQueue: notificationQueue,
+    lastQueueProcessingTime: lastQueueProcessingTime,
     refreshToken: refreshToken || existingUser.refreshToken, // Only update if provided
     userId: userId || existingUser.userId // Store User ID
   };
@@ -251,6 +254,7 @@ async function fetchCourseWork(accessToken) {
 
     // 2. Get Work for each course (Sequential to avoid rate limits)
     for (const course of courses) {
+      // 2a. Get Assignments
       const workRes = await fetch(
         `https://classroom.googleapis.com/v1/courses/${course.id}/courseWork`,
         { headers: { 'Authorization': `Bearer ${accessToken}` } }
@@ -259,25 +263,45 @@ async function fetchCourseWork(accessToken) {
       const workData = await workRes.json();
       const works = workData.courseWork || [];
 
-      // Limit check to recent assignments to save bandwidth? For now, check all.
+      // 2b. Get ALL Submissions (Batch)
+      const submissionsMap = new Map();
+      let pageToken = null;
+      let fetchNext = true;
+
+      while (fetchNext) {
+        const url = new URL(`https://classroom.googleapis.com/v1/courses/${course.id}/courseWork/-/studentSubmissions`);
+        if (pageToken) url.searchParams.append('pageToken', pageToken);
+
+        const subRes = await fetch(url.toString(), { 
+            headers: { 'Authorization': `Bearer ${accessToken}` } 
+        });
+
+        if (subRes.ok) {
+            const subData = await subRes.json();
+            if (subData.studentSubmissions) {
+                subData.studentSubmissions.forEach(sub => {
+                    submissionsMap.set(sub.courseWorkId, sub);
+                });
+            }
+            pageToken = subData.nextPageToken;
+            if (!pageToken) fetchNext = false;
+        } else {
+            console.error(`Failed to fetch submissions for course ${course.id}`);
+            fetchNext = false;
+        }
+      }
+
+      // 3. Match Assignments with Submissions
       for (const work of works) {
-        // Get Submission Status
-        const subRes = await fetch(
-          `https://classroom.googleapis.com/v1/courses/${course.id}/courseWork/${work.id}/studentSubmissions`,
-          { headers: { 'Authorization': `Bearer ${accessToken}` } }
-        );
-        
         let status = 'pending';
         let completionTime = null;
 
-        if (subRes.ok) {
-          const subData = await subRes.json();
-          const submission = subData.studentSubmissions?.[0];
-          if (submission) {
-            const isSubmitted = submission.state === 'TURNED_IN' || submission.state === 'RETURNED';
-            status = isSubmitted ? 'submitted' : submission.late ? 'late' : 'pending';
-             if (isSubmitted) completionTime = submission.updateTime;
-          }
+        const submission = submissionsMap.get(work.id);
+        
+        if (submission) {
+          const isSubmitted = submission.state === 'TURNED_IN' || submission.state === 'RETURNED';
+          status = isSubmitted ? 'submitted' : submission.late ? 'late' : 'pending';
+           if (isSubmitted) completionTime = submission.updateTime;
         }
 
         allAssignments.push({
@@ -382,11 +406,20 @@ async function checkAssignmentsAndPush() {
 }
 
 function processNotificationQueues() {
+  const now = Date.now();
+  const MIN_INTERVAL = 30 * 60 * 1000; // 30 Minutes between notifications per user
+
   Object.keys(subscriptions).forEach(clientId => {
     const user = subscriptions[clientId];
     
     // Skip if no queue or empty queue
     if (!user.notificationQueue || user.notificationQueue.length === 0) return;
+
+    // THROTTLE CHECK: Ensure we don't send too frequently to the same user
+    // If we sent one recently, skip this cycle.
+    if (user.lastQueueProcessingTime && (now - user.lastQueueProcessingTime) < MIN_INTERVAL) {
+        return;
+    }
 
     // Get the first item (FIFO)
     const item = user.notificationQueue[0];
@@ -396,7 +429,8 @@ function processNotificationQueues() {
     webPush.sendNotification(user.subscription, item.payload)
       .then(() => {
         console.log(`✅ Push sent to ${clientId} for ${item.notifKey}`);
-        user.lastNotified[item.notifKey] = Date.now();
+        user.lastNotified[item.notifKey] = now;
+        user.lastQueueProcessingTime = now; // Update throttle timestamp
         
         // Remove from queue
         user.notificationQueue.shift();
@@ -420,15 +454,14 @@ function processNotificationQueues() {
   });
 }
 
-// Run check every 30 minutes
-setInterval(checkAssignmentsAndPush, 10 * 60 * 1000); //Testing: 1 minute
-// setInterval(checkAssignmentsAndPush, 30 * 60 * 1000); // Production: 30 minutes
-// Also run on startup after a delay
-setTimeout(checkAssignmentsAndPush, 5000);
+// Run check every 30 minutes (Fetch new data & queue items)
+setInterval(checkAssignmentsAndPush, 10 * 60 * 1000); 
+setTimeout(checkAssignmentsAndPush, 5000); // Initial check
 
-// Process Queue Interval
-// setInterval(processNotificationQueues, 10 * 60 * 1000); // 10 minutes (Production)
-setInterval(processNotificationQueues, 10 * 60 * 1000); // 1 minute (Testing)
+// Process Queue Interval (Check if we should send the next item)
+// We run this frequently (e.g. every minute) so we can catch the moment the 30min window opens,
+// but the 'lastQueueProcessingTime' check inside ensures we don't spam.
+setInterval(processNotificationQueues, 60 * 1000); // Check queue every minute
 
 
 // Proxy endpoint for OpenAI Chat

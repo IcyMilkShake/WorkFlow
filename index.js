@@ -1771,67 +1771,57 @@ async function loadAssignments() {
         if (!courseworkResponse.ok) continue;
 
         const courseworkData = await courseworkResponse.json();
-        let coursework = courseworkData.courseWork || [];
+        const coursework = courseworkData.courseWork || [];
 
-        // Filter out old assignments BEFORE fetching submissions
-        coursework = coursework.filter(work => {
-          if (!work.dueDate) return true;
-          
-          const dueDate = new Date(work.dueDate.year, work.dueDate.month - 1, work.dueDate.day);
-          const daysSinceDue = Math.floor((today - dueDate) / (1000 * 60 * 60 * 24));
-          
-          // Skip if older than 1 year OR overdue by 365+ days
-          return dueDate >= oneYearAgo && daysSinceDue < 365;
-        });
+        // Fetch ALL submissions for this course in one go (using wildcard '-')
+        // This dramatically reduces API calls from N+1 to 2 per course
+        const allSubmissions = await fetchAllCourseSubmissions(course.id, googleAccessToken);
+        const submissionsMap = new Map();
         
-        // Process submissions in small batches with delays
-        const BATCH_SIZE = 3;
-        for (let j = 0; j < coursework.length; j += BATCH_SIZE) {
-          const batch = coursework.slice(j, j + BATCH_SIZE);
-          
-          // Small delay between batches
-          if (j > 0) await new Promise(r => setTimeout(r, 100));
-          
-          const batchResults = await Promise.all(batch.map(async (work) => {
-            try {
-              const submissionResponse = await fetchWithBackoff(
-                `https://classroom.googleapis.com/v1/courses/${course.id}/courseWork/${work.id}/studentSubmissions`,
-                { headers: { 'Authorization': `Bearer ${googleAccessToken}` }}
-              );
+        allSubmissions.forEach(sub => {
+          // Map courseWorkId -> submission object
+          // Note: studentSubmissions list can contain multiple submissions for same work if multiple students (for teachers)
+          // but we are fetching as student ('me'), so usually one per work.
+          // However, the list returns objects that have 'courseWorkId'.
+          submissionsMap.set(sub.courseWorkId, sub);
+        });
 
-              let status = 'pending';
-              let completionTime = null;
+        // Filter and map assignments
+        const processedAssignments = coursework.map(work => {
+          // 1. Check Age Filter
+          if (work.dueDate) {
+            const dueDate = new Date(work.dueDate.year, work.dueDate.month - 1, work.dueDate.day);
+            const daysSinceDue = Math.floor((today - dueDate) / (1000 * 60 * 60 * 24));
+            // Skip if older than 1 year OR overdue by 365+ days
+            if (dueDate < oneYearAgo || daysSinceDue >= 365) return null;
+          }
 
-              if (submissionResponse.ok) {
-                const submissionData = await submissionResponse.json();
-                const submission = submissionData.studentSubmissions?.[0];
-                if (submission) {
-                  const isSubmitted = submission.state === 'TURNED_IN' || submission.state === 'RETURNED';
-                  status = isSubmitted ? 'submitted' : submission.late ? 'late' : 'pending';
-                  if (isSubmitted) completionTime = submission.updateTime;
-                }
-              }
+          // 2. Match Submission
+          const submission = submissionsMap.get(work.id);
+          let status = 'pending';
+          let completionTime = null;
 
-              return {
-                source: 'google',
-                title: work.title,
-                courseName: course.name,
-                description: work.description,
-                maxPoints: work.maxPoints,
-                dueDate: work.dueDate,
-                dueTime: work.dueTime,
-                status: status,
-                link: work.alternateLink,
-                completionTime: completionTime
-              };
-            } catch (error) {
-              console.error(`Error loading submission:`, error);
-              return null;
-            }
-          }));
-          
-          allAssignments.push(...batchResults.filter(a => a !== null));
-        }
+          if (submission) {
+            const isSubmitted = submission.state === 'TURNED_IN' || submission.state === 'RETURNED';
+            status = isSubmitted ? 'submitted' : submission.late ? 'late' : 'pending';
+            if (isSubmitted) completionTime = submission.updateTime;
+          }
+
+          return {
+            source: 'google',
+            title: work.title,
+            courseName: course.name,
+            description: work.description,
+            maxPoints: work.maxPoints,
+            dueDate: work.dueDate,
+            dueTime: work.dueTime,
+            status: status,
+            link: work.alternateLink,
+            completionTime: completionTime
+          };
+        }).filter(a => a !== null); // Remove filtered items
+        
+        allAssignments.push(...processedAssignments);
 
       } catch (error) {
         console.error(`Error loading coursework for ${course.name}:`, error);
@@ -1952,6 +1942,43 @@ function formatDueDate(assignment) {
   if (diffDays < 7) return `Due in ${diffDays} days`;
   
   return `Due ${date.toLocaleDateString()}`;
+}
+
+async function fetchAllCourseSubmissions(courseId, accessToken) {
+  let submissions = [];
+  let pageToken = null;
+  
+  do {
+    const url = new URL(`https://classroom.googleapis.com/v1/courses/${courseId}/courseWork/-/studentSubmissions`);
+    if (pageToken) url.searchParams.append('pageToken', pageToken);
+    
+    // We only need the latest submission state, usually.
+    // 'courseWorkId' is '-' which means ALL course work.
+    
+    try {
+      const response = await fetchWithBackoff(url.toString(), {
+        headers: { 'Authorization': `Bearer ${accessToken}` }
+      });
+      
+      if (!response.ok) {
+        if (response.status === 403) return []; // Permission denied or no access
+        console.error(`Failed to fetch submissions for course ${courseId}: ${response.status}`);
+        return submissions; 
+      }
+      
+      const data = await response.json();
+      if (data.studentSubmissions) {
+        submissions.push(...data.studentSubmissions);
+      }
+      
+      pageToken = data.nextPageToken;
+    } catch (err) {
+      console.error('Error fetching submissions page:', err);
+      break;
+    }
+  } while (pageToken);
+  
+  return submissions;
 }
 
 // ==========================================
