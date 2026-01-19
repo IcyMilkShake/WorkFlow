@@ -922,6 +922,207 @@
                 display: block;
             }
         }
+        /* ==========================================
+   MOBILE NAVBAR FIX
+   ========================================== */
+
+@media (max-width: 768px) {
+    .navbar {
+        padding: 0.75rem 1rem;
+        flex-wrap: nowrap;
+    }
+
+    .navbar-left h4 {
+        font-size: 1rem;
+        white-space: nowrap;
+    }
+
+    .navbar-right {
+        gap: 0.5rem;
+        flex-shrink: 0;
+    }
+
+    .user-profile {
+        padding: 0.25rem 0.5rem;
+        gap: 0.5rem;
+    }
+
+    .user-avatar {
+        width: 28px;
+        height: 28px;
+    }
+
+    .user-name {
+        font-size: 0.75rem;
+    }
+
+    .badge {
+        display: none; /* Hide "Connected" badge on mobile */
+    }
+
+    #logoutBtn {
+        padding: 0.5rem 0.75rem !important;
+        font-size: 0.75rem;
+        white-space: nowrap;
+    }
+
+    .menu-toggle {
+        padding-right: 0.5rem;
+        font-size: 1.25rem;
+    }
+}
+
+/* ==========================================
+   MOBILE SCHEDULE EDITOR
+   ========================================== */
+
+/* Floating Assignment Drawer */
+.mobile-assignment-drawer {
+    display: none;
+    position: sticky;
+    top: 60px;
+    z-index: 40;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    margin-bottom: 1rem;
+    overflow: hidden;
+}
+
+.mobile-drawer-toggle {
+    padding: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    background: var(--card-bg);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.mobile-drawer-toggle:hover {
+    background: rgba(182, 109, 255, 0.05);
+}
+
+.mobile-drawer-content {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease;
+}
+
+.mobile-drawer-content.open {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.mobile-drawer-content .unscheduled-assignment {
+    margin: 0.5rem;
+}
+
+@media (max-width: 991px) {
+    /* Hide desktop sidebar on schedule page */
+    .schedule-container {
+        grid-template-columns: 1fr;
+    }
+
+    #unscheduledCard {
+        display: none;
+    }
+
+    .mobile-assignment-drawer {
+        display: block;
+    }
+
+    /* Make calendar responsive */
+    .calendar-grid {
+        grid-template-columns: repeat(7, 1fr);
+        gap: 2px;
+    }
+
+    .calendar-day {
+        min-height: 80px;
+        padding: 0.25rem;
+        font-size: 0.75rem;
+    }
+
+    .calendar-day-header-wrapper {
+        flex-direction: row;
+        align-items: center;
+        margin-bottom: 0.25rem;
+    }
+
+    .schedule-event {
+        font-size: 0.65rem;
+        padding: 0.2rem 0.4rem;
+        margin-bottom: 0.2rem;
+    }
+
+    .schedule-event-content {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+}
+
+@media (max-width: 576px) {
+    .calendar-grid {
+        gap: 1px;
+    }
+
+    .calendar-day {
+        min-height: 60px;
+        padding: 0.2rem;
+    }
+
+    .calendar-header-cell {
+        padding: 0.5rem 0.25rem;
+        font-size: 0.7rem;
+    }
+
+    .schedule-event {
+        font-size: 0.6rem;
+        padding: 0.15rem 0.3rem;
+    }
+}
+
+/* Touch-friendly dragging for mobile */
+@media (max-width: 991px) {
+    .unscheduled-assignment {
+        cursor: grab;
+        touch-action: none;
+        user-select: none;
+    }
+
+    .unscheduled-assignment:active {
+        cursor: grabbing;
+        opacity: 0.7;
+        transform: scale(0.95);
+    }
+}
+
+/* Prevent text selection during drag on mobile */
+.unscheduled-assignment * {
+    pointer-events: none;
+}
+
+/* Extra small phones (iPhone SE) */
+@media (max-width: 375px) {
+    .navbar-left h4 {
+        font-size: 0.875rem;
+    }
+
+    .user-name {
+        display: none; /* Hide username on very small screens */
+    }
+
+    #logoutBtn {
+        padding: 0.4rem 0.6rem !important;
+        font-size: 0.7rem;
+    }
+
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+}
     </style>
 </head>
 <body>

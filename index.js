@@ -204,6 +204,9 @@ function renderScheduleCalendar() {
       }).join('')}
     </div>
   `;
+  if (window.innerWidth <= 991) {
+    createMobileDrawer();
+  }
 }
 
 function renderUnscheduledAssignments() {
@@ -272,6 +275,9 @@ function renderUnscheduledAssignments() {
     el.addEventListener('dragstart', handleDragStart);
     el.addEventListener('dragend', handleDragEnd);
   });
+  if (window.innerWidth <= 991) {
+    renderMobileUnscheduledList();
+  }
 }
 
 function handleDragStart(e) {
@@ -566,6 +572,220 @@ window.deleteScheduleEvent = function(dateKey, eventId) {
   
   document.querySelector('[style*=fixed]').remove();
   showToast('🗑️ Event deleted');
+}
+
+// ==========================================
+// MOBILE SCHEDULE DRAWER
+// ==========================================
+
+function createMobileDrawer() {
+    const schedulePage = document.getElementById('schedulePage');
+    if (!schedulePage) return;
+
+    // Check if drawer already exists
+    let drawer = document.getElementById('mobileDrawer');
+    if (!drawer) {
+        drawer = document.createElement('div');
+        drawer.id = 'mobileDrawer';
+        drawer.className = 'mobile-assignment-drawer';
+        
+        drawer.innerHTML = `
+            <div class="mobile-drawer-toggle" onclick="toggleMobileDrawer()">
+                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                    <i class="ph ph-list" style="font-size: 1.5rem; color: var(--primary);"></i>
+                    <div>
+                        <div style="font-weight: 600;">Pending Assignments</div>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary);" id="mobileDrawerCount">0 assignments</div>
+                    </div>
+                </div>
+                <i class="ph ph-caret-down" id="mobileDrawerIcon" style="font-size: 1.25rem; color: var(--primary); transition: transform 0.3s;"></i>
+            </div>
+            <div class="mobile-drawer-content" id="mobileDrawerContent">
+                <div id="mobileUnscheduledList" style="padding: 0.5rem;"></div>
+            </div>
+        `;
+        
+        // Insert at the top of schedule page
+        const scheduleContainer = schedulePage.querySelector('.schedule-container');
+        if (scheduleContainer) {
+            scheduleContainer.parentNode.insertBefore(drawer, scheduleContainer);
+        }
+    }
+    
+    renderMobileUnscheduledList();
+}
+
+window.toggleMobileDrawer = function() {
+    const content = document.getElementById('mobileDrawerContent');
+    const icon = document.getElementById('mobileDrawerIcon');
+    
+    if (content && icon) {
+        content.classList.toggle('open');
+        icon.style.transform = content.classList.contains('open') ? 'rotate(180deg)' : 'rotate(0deg)';
+    }
+}
+
+function renderMobileUnscheduledList() {
+    const container = document.getElementById('mobileUnscheduledList');
+    const countDiv = document.getElementById('mobileDrawerCount');
+    
+    if (!container) return;
+
+    const scheduled = new Set();
+    Object.values(scheduleEvents).forEach(dayEvents => {
+        dayEvents.forEach(event => {
+            if (event.assignmentId) scheduled.add(event.assignmentId);
+        });
+    });
+
+    const filtered = allAssignmentsData.filter(a => 
+        !ignoredCourses.has(a.courseName) && 
+        a.status !== 'submitted' &&
+        !scheduled.has(a.title + '_' + a.courseName)
+    );
+    
+    if (countDiv) {
+        countDiv.textContent = `${filtered.length} assignment${filtered.length !== 1 ? 's' : ''}`;
+    }
+
+    if (filtered.length === 0) {
+        container.innerHTML = `
+            <div style="text-align: center; padding: 2rem; color: var(--text-secondary);">
+                <div style="font-size: 2rem; margin-bottom: 0.5rem;"><i class="ph ph-check-circle"></i></div>
+                <div>All scheduled!</div>
+            </div>`;
+        return;
+    }
+
+    container.innerHTML = filtered.map(assignment => {
+        const dueDate = formatDueDate(assignment);
+        return `
+            <div 
+                class="unscheduled-assignment"
+                data-assignment='${JSON.stringify(assignment).replace(/'/g, "&#39;")}'
+                style="background: var(--card-bg); border: 1px solid var(--border-color); border-left: 3px solid ${assignment.status === 'late' ? 'var(--danger)' : 'var(--warning)'}; padding: 0.75rem; margin-bottom: 0.5rem; border-radius: 8px; cursor: grab; transition: all 0.2s;"
+            >
+                <div style="font-weight: 600; margin-bottom: 0.25rem; font-size: 0.875rem;">${assignment.title}</div>
+                <div style="font-size: 0.75rem; color: var(--text-secondary);">${assignment.courseName}</div>
+                <div style="font-size: 0.7rem; color: ${assignment.status === 'late' ? 'var(--danger)' : 'var(--warning)'}; margin-top: 0.5rem;">
+                    <i class="ph ph-calendar"></i> ${dueDate}
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    // Attach drag handlers
+    container.querySelectorAll('.unscheduled-assignment').forEach(el => {
+        el.draggable = true;
+        el.addEventListener('dragstart', handleDragStart);
+        el.addEventListener('dragend', handleDragEnd);
+        
+        // Add touch support for mobile
+        el.addEventListener('touchstart', handleTouchStart, { passive: false });
+        el.addEventListener('touchmove', handleTouchMove, { passive: false });
+        el.addEventListener('touchend', handleTouchEnd, { passive: false });
+    });
+}
+
+// ==========================================
+// TOUCH SUPPORT FOR MOBILE DRAG & DROP
+// ==========================================
+
+let touchStartX, touchStartY;
+let touchElement = null;
+let touchClone = null;
+
+function handleTouchStart(e) {
+    touchElement = e.currentTarget;
+    draggedAssignment = JSON.parse(touchElement.dataset.assignment);
+    
+    const touch = e.touches[0];
+    touchStartX = touch.clientX;
+    touchStartY = touch.clientY;
+    
+    // Create visual clone
+    touchClone = touchElement.cloneNode(true);
+    touchClone.style.position = 'fixed';
+    touchClone.style.zIndex = '9999';
+    touchClone.style.opacity = '0.8';
+    touchClone.style.pointerEvents = 'none';
+    touchClone.style.width = touchElement.offsetWidth + 'px';
+    touchClone.style.left = touch.clientX - (touchElement.offsetWidth / 2) + 'px';
+    touchClone.style.top = touch.clientY - 30 + 'px';
+    touchClone.style.transform = 'rotate(-2deg) scale(1.05)';
+    touchClone.style.boxShadow = '0 10px 30px rgba(0,0,0,0.3)';
+    document.body.appendChild(touchClone);
+    
+    touchElement.style.opacity = '0.3';
+}
+
+function handleTouchMove(e) {
+    e.preventDefault();
+    
+    if (!touchClone) return;
+    
+    const touch = e.touches[0];
+    touchClone.style.left = touch.clientX - (touchElement.offsetWidth / 2) + 'px';
+    touchClone.style.top = touch.clientY - 30 + 'px';
+    
+    // Highlight calendar days under touch
+    const elementUnderTouch = document.elementFromPoint(touch.clientX, touch.clientY);
+    const calendarDay = elementUnderTouch?.closest('.calendar-day');
+    
+    document.querySelectorAll('.calendar-day').forEach(day => {
+        day.style.background = 'var(--card-bg)';
+    });
+    
+    if (calendarDay) {
+        calendarDay.style.background = 'rgba(182, 109, 255, 0.1)';
+    }
+}
+
+function handleTouchEnd(e) {
+    if (touchClone) {
+        touchClone.remove();
+        touchClone = null;
+    }
+    
+    if (touchElement) {
+        touchElement.style.opacity = '1';
+    }
+    
+    // Find drop target
+    const touch = e.changedTouches[0];
+    const elementUnderTouch = document.elementFromPoint(touch.clientX, touch.clientY);
+    const calendarDay = elementUnderTouch?.closest('.calendar-day');
+    
+    if (calendarDay && draggedAssignment) {
+        const dateKey = calendarDay.dataset.date;
+        
+        if (!scheduleEvents[dateKey]) scheduleEvents[dateKey] = [];
+
+        const eventId = Date.now().toString();
+        scheduleEvents[dateKey].push({
+            id: eventId,
+            title: draggedAssignment.title,
+            assignmentId: draggedAssignment.title + '_' + draggedAssignment.courseName,
+            courseName: draggedAssignment.courseName,
+            startTime: '09:00',
+            endTime: '10:00',
+            alertBefore: 60,
+            link: draggedAssignment.link
+        });
+
+        renderScheduleCalendar();
+        renderUnscheduledAssignments();
+        renderMobileUnscheduledList();
+        showToast(`✅ Added to ${dateKey}`);
+    }
+    
+    // Reset highlights
+    document.querySelectorAll('.calendar-day').forEach(day => {
+        day.style.background = 'var(--card-bg)';
+    });
+    
+    draggedAssignment = null;
+    touchElement = null;
 }
 
 window.exportToICS = function() {
@@ -1771,10 +1991,14 @@ window.showPage = function(page) {
       break;
       
     case 'schedule':
-      // Wait for DOM to be ready
       setTimeout(() => {
         renderScheduleCalendar();
         renderUnscheduledAssignments();
+        
+        // ADD THESE 3 NEW LINES:
+        if (window.innerWidth <= 991) {
+          createMobileDrawer();
+        }
       }, 0);
       break;
       
