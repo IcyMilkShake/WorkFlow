@@ -160,7 +160,7 @@ function renderScheduleCalendar() {
       ).join('')}
       
       ${Array(startingDayOfWeek).fill(null).map(() => 
-        `<div class="calendar-day" style="background: var(--dark); min-height: 120px; opacity: 0.5; cursor: default;"></div>`
+        `<div class="calendar-day calendar-day-empty"></div>`
       ).join('')}
       
       ${Array.from({length: daysInMonth}, (_, i) => {
