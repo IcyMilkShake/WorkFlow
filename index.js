@@ -160,7 +160,7 @@ function renderScheduleCalendar() {
       ).join('')}
       
       ${Array(startingDayOfWeek).fill(null).map(() => 
-        `<div class="calendar-day" style="background: var(--dark); min-height: 120px; opacity: 0.5; cursor: default;"></div>`
+        `<div class="calendar-day calendar-day-empty"></div>`
       ).join('')}
       
       ${Array.from({length: daysInMonth}, (_, i) => {
@@ -496,6 +496,7 @@ window.editScheduleEvent = function(dateKey, eventId) {
   if (!event) return;
 
   const modal = document.createElement('div');
+  modal.className = 'edit-event-modal';
   modal.style.cssText = `
     position: fixed; top: 0; left: 0; width: 100%; height: 100vh;
     background: rgba(0,0,0,0.7); z-index: 1000; display: flex;
@@ -537,7 +538,7 @@ window.editScheduleEvent = function(dateKey, eventId) {
       <div style="display: flex; gap: 1rem;">
         <button class="btn btn-primary" onclick="saveScheduleEvent('${dateKey}', '${eventId}')" style="flex: 1;">Save</button>
         <button class="btn btn-danger" onclick="deleteScheduleEvent('${dateKey}', '${eventId}')" style="flex: 1;">Delete</button>
-        <button class="btn" onclick="this.closest('[style*=fixed]').remove()" style="flex: 1; background: var(--dark); color: var(--text-primary);">Cancel</button>
+        <button class="btn" onclick="document.querySelector('.edit-event-modal').remove()" style="flex: 1; background: var(--dark); color: var(--text-primary);">Cancel</button>
       </div>
     </div>
   `;
@@ -559,7 +560,7 @@ window.saveScheduleEvent = function(dateKey, eventId) {
 
   renderScheduleCalendar();
   
-  document.querySelector('[style*=fixed]').remove();
+  document.querySelector('.edit-event-modal').remove();
   showToast('✅ Event updated');
 }
 
@@ -570,7 +571,7 @@ window.deleteScheduleEvent = function(dateKey, eventId) {
   renderScheduleCalendar();
   renderUnscheduledAssignments();
   
-  document.querySelector('[style*=fixed]').remove();
+  document.querySelector('.edit-event-modal').remove();
   showToast('🗑️ Event deleted');
 }
 

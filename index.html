@@ -855,6 +855,13 @@
             min-width: 0; /* Fix grid overflow */
         }
         
+        .calendar-day-empty {
+            background: var(--dark);
+            min-height: 120px;
+            opacity: 0.5;
+            cursor: default;
+        }
+        
         .mobile-day-label {
             display: none;
             font-weight: 600;
@@ -1010,7 +1017,7 @@
 }
 
 .mobile-drawer-content.open {
-    max-height: 400px;
+    max-height: 190px;
     overflow-y: auto;
 }
 
@@ -1121,6 +1128,48 @@
 
     .stats-grid {
         grid-template-columns: 1fr;
+    }
+}
+
+/* Calendar List View for Small Mobile (< 576px) */
+@media (max-width: 576px) {
+    .calendar-grid {
+        display: flex;
+        flex-direction: column;
+        border: none;
+    }
+
+    .calendar-header-cell, 
+    .calendar-day-empty {
+        display: none;
+    }
+
+    .calendar-day {
+        min-height: auto;
+        border: none;
+        border-bottom: 1px solid var(--border-color);
+        padding: 1rem;
+    }
+    
+    .calendar-day-header-wrapper {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 0.75rem;
+        font-size: 1rem;
+    }
+
+    .mobile-day-label {
+        display: inline-block;
+        font-weight: 600;
+        color: var(--text-secondary);
+        width: 3rem; /* Fixed width for alignment */
+    }
+    
+    .schedule-event {
+        font-size: 0.8rem;
+        padding: 0.5rem;
+        margin-bottom: 0.5rem;
     }
 }
     </style>
