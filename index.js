@@ -90,6 +90,36 @@ async function fetchWithBackoff(url, options, retries = 3, backoff = 1000) {
 }
 
 // ==========================================
+// LOADING OVERLAY FUNCTIONS
+// ==========================================
+function showLoadingOverlay(status = 'Initializing...') {
+  const overlay = byId('loadingOverlay');
+  const statusText = byId('loadingStatus');
+  const loadingBar = byId('loadingBar');
+  
+  if (overlay) {
+    overlay.style.display = 'flex';
+    if (statusText) statusText.textContent = status;
+    if (loadingBar) loadingBar.style.width = '0%';
+  }
+}
+
+function updateLoadingProgress(percent, status) {
+  const loadingBar = byId('loadingBar');
+  const statusText = byId('loadingStatus');
+  
+  if (loadingBar) loadingBar.style.width = `${percent}%`;
+  if (statusText) statusText.textContent = status;
+}
+
+function hideLoadingOverlay() {
+  const overlay = byId('loadingOverlay');
+  if (overlay) {
+    overlay.style.display = 'none';
+  }
+}
+
+// ==========================================
 // STATE MANAGEMENT
 // ==========================================
 let googleTokenClient;
@@ -1160,7 +1190,121 @@ window.changeProductivityView = function(view) {
   });
   generateProductivityChart(view);
 }
+// ==========================================
+// ASSIGNMENT FILTERS
+// ==========================================
+let currentFilters = {
+  dueDate: 'all',
+  sort: 'dueDate',
+  status: 'all'
+};
 
+window.applyFilters = function() {
+  currentFilters.dueDate = byId('dueDateFilter').value;
+  currentFilters.sort = byId('sortFilter').value;
+  currentFilters.status = byId('statusFilter').value;
+  
+  displayAssignments(allAssignmentsData);
+}
+
+window.resetFilters = function() {
+  byId('dueDateFilter').value = 'all';
+  byId('sortFilter').value = 'dueDate';
+  byId('statusFilter').value = 'all';
+  
+  currentFilters = {
+    dueDate: 'all',
+    sort: 'dueDate',
+    status: 'all'
+  };
+  
+  displayAssignments(allAssignmentsData);
+}
+
+function filterAssignments(assignments) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  let filtered = assignments.filter(a => !ignoredCourses.has(a.courseName));
+  
+  // Filter by status (pending/late)
+  filtered = filtered.filter(a => a.status !== 'submitted');
+  
+  if (currentFilters.status !== 'all') {
+    filtered = filtered.filter(a => a.status === currentFilters.status);
+  }
+  
+  // Filter by due date
+  if (currentFilters.dueDate !== 'all') {
+    filtered = filtered.filter(a => {
+      const dueDate = parseGoogleDate(a.dueDate);
+      if (!dueDate) return false;
+      
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      
+      const weekFromNow = new Date(today);
+      weekFromNow.setDate(weekFromNow.getDate() + 7);
+      
+      const monthFromNow = new Date(today);
+      monthFromNow.setMonth(monthFromNow.getMonth() + 1);
+      
+      switch(currentFilters.dueDate) {
+        case 'today':
+          return dueDate.getTime() === today.getTime();
+        case 'tomorrow':
+          return dueDate.getTime() === tomorrow.getTime();
+        case 'week':
+          return dueDate >= today && dueDate <= weekFromNow;
+        case 'month':
+          return dueDate >= today && dueDate <= monthFromNow;
+        case 'overdue':
+          return dueDate < today;
+        default:
+          return true;
+      }
+    });
+  }
+  
+  // Sort assignments
+  filtered.sort((a, b) => {
+    const dateA = parseGoogleDate(a.dueDate);
+    const dateB = parseGoogleDate(b.dueDate);
+    
+    switch(currentFilters.sort) {
+      case 'dueDate':
+        if (!dateA) return 1;
+        if (!dateB) return -1;
+        return dateA - dateB;
+        
+      case 'dueDateDesc':
+        if (!dateA) return 1;
+        if (!dateB) return -1;
+        return dateB - dateA;
+        
+      case 'points':
+        const pointsA = a.maxPoints || 0;
+        const pointsB = b.maxPoints || 0;
+        return pointsB - pointsA;
+        
+      case 'pointsAsc':
+        const pointsA2 = a.maxPoints || 0;
+        const pointsB2 = b.maxPoints || 0;
+        return pointsA2 - pointsB2;
+        
+      case 'course':
+        return a.courseName.localeCompare(b.courseName);
+        
+      case 'title':
+        return a.title.localeCompare(b.title);
+        
+      default:
+        return 0;
+    }
+  });
+  
+  return filtered;
+}
 // ==========================================
 // STATISTICS
 // ==========================================
