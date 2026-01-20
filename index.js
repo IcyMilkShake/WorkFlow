@@ -2026,26 +2026,23 @@ function updateStats(assignments) {
 
 function displayAssignments(assignments) {
   const assignmentsList = byId('assignmentsList');
-  const filteredAssignments = assignments.filter(a => !ignoredCourses.has(a.courseName));
-  const pendingAssignments = filteredAssignments.filter(a => a.status !== 'submitted');
   
+  // Use centralized filter function which handles sorting, ignored courses, and current filter state
+  const pendingAssignments = filterAssignments(assignments);
+  
+  // Update result count in the filter bar
+  const countEl = byId('filterResultCount');
+  if (countEl) countEl.textContent = pendingAssignments.length;
+
   if (pendingAssignments.length === 0) {
     assignmentsList.innerHTML = `
       <div class="empty-state">
         <div class="empty-state-icon"><i class="ph ph-confetti"></i></div>
-        <h3>All caught up!</h3>
-        <p>You have no pending assignments.</p>
+        <h3>No assignments found</h3>
+        <p>Try adjusting your filters.</p>
       </div>`;
     return;
   }
-
-  pendingAssignments.sort((a, b) => {
-    const dateA = parseGoogleDate(a.dueDate);
-    const dateB = parseGoogleDate(b.dueDate);
-    if (!dateA) return 1;
-    if (!dateB) return -1;
-    return dateA - dateB;
-  });
 
   assignmentsList.innerHTML = pendingAssignments.map(assignment => {
     const dueDate = formatDueDate(assignment);
