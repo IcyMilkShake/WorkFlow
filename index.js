@@ -1798,11 +1798,10 @@ async function exchangeCodeForToken(code) {
 }
 
 async function loadAssignments() {
-  const loadingMsg = byId('loadingMsg');
   const assignmentsList = byId('assignmentsList');
   
   isLoading = true;
-  loadingMsg.style.display = 'block';
+  showLoadingOverlay('Loading your courses...');
   assignmentsList.innerHTML = '';
   updateAIViewIfActive();
 
@@ -1903,6 +1902,10 @@ async function loadAssignments() {
     for (let i = 0; i < courses.length; i++) {
       const course = courses[i];
       
+      // Update loading progress
+      const percent = Math.round(((i + 1) / courses.length) * 100);
+      updateLoadingProgress(percent, `Fetching ${course.name}...`);
+      
       try {
         // Small delay between courses
         if (i > 0) await new Promise(r => setTimeout(r, 200));
@@ -1993,7 +1996,7 @@ async function loadAssignments() {
 
   } finally {
     isLoading = false;
-    loadingMsg.style.display = 'none';
+    hideLoadingOverlay();
     updateAIViewIfActive();
   }
 }
