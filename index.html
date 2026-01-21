@@ -1248,19 +1248,20 @@
     }
 }
 
-/* Touch-friendly dragging for mobile */
-@media (max-width: 991px) {
-    .unscheduled-assignment {
-        cursor: grab;
-        touch-action: none;
-        user-select: none;
-    }
+/* Touch-friendly dragging */
+.unscheduled-assignment {
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+}
 
-    .unscheduled-assignment:active {
-        cursor: grabbing;
-        opacity: 0.7;
-        transform: scale(0.95);
-    }
+.unscheduled-assignment:active {
+    cursor: grabbing;
+    opacity: 0.7;
+    transform: scale(0.95);
+}
+
+@media (max-width: 991px) {
 }
 
 /* Prevent text selection during drag on mobile */

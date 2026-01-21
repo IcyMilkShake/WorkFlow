@@ -1,16 +1,8 @@
-
-> start
-> node server.js
-
-[dotenv@17.2.3] injecting env (0) from .env -- tip: ⚙️  override existing env vars with { override: true }
-✨ Generated new VAPID keys
-✅ Web Push initialized
-undefined
-🚀 Server running on port 8080
-📱 PWA ready for installation
-
-✅ Features enabled:
-  - Offline support
-  - Auto-updates
-  - Install prompts
-🔍 Checking assignments for push notifications...
+127.0.0.1 - - [21/Jan/2026 12:15:52] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jan/2026 12:15:52] "GET /icons/icon-192x192.png HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jan/2026 12:15:52] "GET /index.js HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jan/2026 12:15:53] "GET /service-worker.js HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jan/2026 12:15:53] "GET /offline.html HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jan/2026 12:15:53] "GET /index.html HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jan/2026 12:15:53] "GET /manifest.json HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jan/2026 12:15:53] "GET / HTTP/1.1" 304 -
