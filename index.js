@@ -235,7 +235,7 @@ function renderScheduleCalendar() {
       }).join('')}
     </div>
   `;
-  if (window.innerWidth <= 991) {
+  if (window.innerWidth <= 767) {
     createMobileDrawer();
   }
 }
@@ -311,7 +311,7 @@ function renderUnscheduledAssignments() {
     el.addEventListener('touchmove', handleTouchMove, { passive: false });
     el.addEventListener('touchend', handleTouchEnd, { passive: false });
   });
-  if (window.innerWidth <= 991) {
+  if (window.innerWidth <= 767) {
     renderMobileUnscheduledList();
   }
 }
@@ -2381,7 +2381,7 @@ window.showPage = function(page) {
         renderUnscheduledAssignments();
         
         // ADD THESE 3 NEW LINES:
-        if (window.innerWidth <= 991) {
+        if (window.innerWidth <= 767) {
           createMobileDrawer();
         }
       }, 0);
