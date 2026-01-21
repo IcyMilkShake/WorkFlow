@@ -4,7 +4,7 @@
   "description": "Track Google Classroom assignments with AI assistance and productivity insights",
   "start_url": "/?source=pwa",
   "scope": "/",
-  "display": "standalone",
+  "display": "fullscreen",
   "background_color": "#191c24",
   "theme_color": "#b66dff",
   "orientation": "portrait-primary",
