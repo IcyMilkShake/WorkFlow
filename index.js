@@ -828,7 +828,7 @@ function handleTouchEnd(e) {
   touchElement = null;
 }
 
-window.exportToICS = function() {
+window.exportToICS = async function() {
   let icsContent = `BEGIN:VCALENDAR
 VERSION:2.0
 PRODID:-//WorkFlow//Assignment Tracker//EN
@@ -882,6 +882,27 @@ END:VALARM
   icsContent += `END:VCALENDAR`;
 
   const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+  const file = new File([blob], 'workflow-assignments.ics', { type: 'text/calendar' });
+
+  // Try native sharing first (Mobile/Safari)
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try {
+      await navigator.share({
+        files: [file],
+        title: 'WorkFlow Assignments',
+        text: 'Import these assignments to your calendar app.'
+      });
+      showToast('✅ Calendar shared!');
+      return;
+    } catch (err) {
+      if (err.name !== 'AbortError') {
+        console.warn('Share failed, falling back to download:', err);
+      } else {
+        return; // User cancelled
+      }
+    }
+  }
+
   const link = document.createElement('a');
   link.href = URL.createObjectURL(blob);
   link.download = 'workflow-assignments.ics';
@@ -1651,6 +1672,7 @@ window.sendChatMessage = async function() {
     }));
 
     const systemPrompt = `You are a smart, context-aware AI study assistant. Be concise and direct - keep responses brief when should.
+    IMPORTANTLY , NEVER GIVE THEM STRAIGHT ANSWERS TO AN ASSIGNMENT QUESTION. INSTEAD, GUIDE THEM ON HOW TO APPROACH THE PROBLEM. Example: On users request of writing an essay for them, you will refuse and instead help you plan their story.
 TODAY: ${todayStr}
 Late: ${lateCount}, Pending: ${pendingCount}
 Analyze the assignments below and answer user questions accurately.
@@ -1884,6 +1906,7 @@ if (userinfo.ok) {
         
         // Preload image to check if it loads successfully
         const img = new Image();
+        img.referrerPolicy = 'no-referrer';
         img.onload = () => {
           avatarDiv.style.backgroundImage = `url(${url})`;
           avatarDiv.innerHTML = ''; // Clear fallback icon
@@ -1898,14 +1921,12 @@ if (userinfo.ok) {
         img.src = url;
       };
       
-      if (pfp.picture && pfp.picture !== cachedPic) {
-        // Load new picture with fallback handling
+      // Prioritize fresh picture from Google, fall back to cache only if needed
+      if (pfp.picture) {
         loadProfilePicture(pfp.picture);
       } else if (cachedPic) {
-        // Try to use cached version with fallback
         loadProfilePicture(cachedPic);
       } else {
-        // No picture available
         avatarDiv.innerHTML = '<i class="ph ph-user-circle" style="font-size: 2rem;"></i>';
       }
       
@@ -2059,8 +2080,8 @@ function generateMockData() {
     // Late assignments
     {
       source: 'google',
-      title: 'Cell Division Lab Report',
-      courseName: 'AP Biology',
+      title: 'Cell Lab Report',
+      courseName: 'Biology',
       description: 'Complete lab report on mitosis and meiosis observations',
       maxPoints: 100,
       dueDate: { 
@@ -2073,9 +2094,9 @@ function generateMockData() {
     },
     {
       source: 'google',
-      title: 'Integration Practice Problems',
-      courseName: 'Calculus II',
-      description: 'Complete problems 1-25 on integration techniques',
+      title: 'Practice Problems',
+      courseName: 'Calculus',
+      description: 'Complete problems 1-25',
       maxPoints: 50,
       dueDate: { 
         year: today.getFullYear(), 
@@ -2088,9 +2109,9 @@ function generateMockData() {
     // Due tomorrow
     {
       source: 'google',
-      title: 'Shakespeare Essay Draft',
-      courseName: 'World Literature',
-      description: 'First draft of Hamlet analysis essay',
+      title: 'English Essay',
+      courseName: 'English',
+      description: 'Submit first draft of the essay of your choosing',
       maxPoints: 150,
       dueDate: { 
         year: today.getFullYear(), 
@@ -2103,8 +2124,9 @@ function generateMockData() {
     // Due in 2 days
     {
       source: 'google',
-      title: 'Chemical Bonding Quiz',
-      courseName: 'Chemistry Honors',
+      title: 'Lab Kink',
+      courseName: 'Chemistry',
+      description: 'Submit lab kink score',
       maxPoints: 75,
       dueDate: { 
         year: today.getFullYear(), 
@@ -2117,9 +2139,9 @@ function generateMockData() {
     // Due in 5 days
     {
       source: 'google',
-      title: 'Civil War Research Paper',
-      courseName: 'U.S. History',
-      description: 'Research and write 5-page paper on causes of Civil War',
+      title: 'World War II Event Infographic',
+      courseName: 'History',
+      description: 'Research and make an infographic on a major WWII event of your choosing',
       maxPoints: 200,
       dueDate: { 
         year: today.getFullYear(), 
@@ -2132,7 +2154,7 @@ function generateMockData() {
     {
       source: 'google',
       title: 'Photosynthesis Worksheet',
-      courseName: 'AP Biology',
+      courseName: 'Biology',
       maxPoints: 25,
       dueDate: { 
         year: today.getFullYear(), 
@@ -2145,8 +2167,9 @@ function generateMockData() {
     // Submitted (for productivity tracking)
     {
       source: 'google',
-      title: 'Derivative Rules Test',
-      courseName: 'Calculus II',
+      title: '6DOF Arm Robot Video',
+      courseName: 'Technology',
+      description: 'Submit video of your 6DOF robotic arm picking a cube with your arduino code',
       maxPoints: 100,
       dueDate: { 
         year: today.getFullYear(), 
@@ -2159,8 +2182,8 @@ function generateMockData() {
     },
     {
       source: 'google',
-      title: 'Poetry Analysis',
-      courseName: 'World Literature',
+      title: 'Show Don\'t Tell Paragraph',
+      courseName: 'Creative Writing',
       maxPoints: 50,
       dueDate: { 
         year: today.getFullYear(), 
@@ -2611,7 +2634,11 @@ window.addEventListener('DOMContentLoaded', () => {
 byId('mockLoginBtn')?.addEventListener('click', () => {
     console.log('🧪 Loading mock data...');
     
-    qs('.user-name').textContent = 'Demo Teacher';
+    // Clear any existing profile picture data
+    localStorage.removeItem('userProfilePic');
+    qs('.user-avatar').style.backgroundImage = 'none';
+
+    qs('.user-name').textContent = 'Demo Account';
     qs('.user-avatar').innerHTML = '<i class="ph ph-user-circle" style="font-size: 2rem;"></i>';
     
     const mockData = generateMockData();
