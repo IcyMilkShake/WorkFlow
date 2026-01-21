@@ -828,7 +828,7 @@ function handleTouchEnd(e) {
   touchElement = null;
 }
 
-window.exportToICS = function() {
+window.exportToICS = async function() {
   let icsContent = `BEGIN:VCALENDAR
 VERSION:2.0
 PRODID:-//WorkFlow//Assignment Tracker//EN
@@ -882,6 +882,27 @@ END:VALARM
   icsContent += `END:VCALENDAR`;
 
   const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+  const file = new File([blob], 'workflow-assignments.ics', { type: 'text/calendar' });
+
+  // Try native sharing first (Mobile/Safari)
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try {
+      await navigator.share({
+        files: [file],
+        title: 'WorkFlow Assignments',
+        text: 'Import these assignments to your calendar app.'
+      });
+      showToast('✅ Calendar shared!');
+      return;
+    } catch (err) {
+      if (err.name !== 'AbortError') {
+        console.warn('Share failed, falling back to download:', err);
+      } else {
+        return; // User cancelled
+      }
+    }
+  }
+
   const link = document.createElement('a');
   link.href = URL.createObjectURL(blob);
   link.download = 'workflow-assignments.ics';
@@ -1884,6 +1905,7 @@ if (userinfo.ok) {
         
         // Preload image to check if it loads successfully
         const img = new Image();
+        img.referrerPolicy = 'no-referrer';
         img.onload = () => {
           avatarDiv.style.backgroundImage = `url(${url})`;
           avatarDiv.innerHTML = ''; // Clear fallback icon
@@ -1898,14 +1920,12 @@ if (userinfo.ok) {
         img.src = url;
       };
       
-      if (pfp.picture && pfp.picture !== cachedPic) {
-        // Load new picture with fallback handling
+      // Prioritize fresh picture from Google, fall back to cache only if needed
+      if (pfp.picture) {
         loadProfilePicture(pfp.picture);
       } else if (cachedPic) {
-        // Try to use cached version with fallback
         loadProfilePicture(cachedPic);
       } else {
-        // No picture available
         avatarDiv.innerHTML = '<i class="ph ph-user-circle" style="font-size: 2rem;"></i>';
       }
       
@@ -2611,6 +2631,10 @@ window.addEventListener('DOMContentLoaded', () => {
 byId('mockLoginBtn')?.addEventListener('click', () => {
     console.log('🧪 Loading mock data...');
     
+    // Clear any existing profile picture data
+    localStorage.removeItem('userProfilePic');
+    qs('.user-avatar').style.backgroundImage = 'none';
+
     qs('.user-name').textContent = 'Demo Teacher';
     qs('.user-avatar').innerHTML = '<i class="ph ph-user-circle" style="font-size: 2rem;"></i>';
     
