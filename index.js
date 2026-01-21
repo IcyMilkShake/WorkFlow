@@ -305,6 +305,11 @@ function renderUnscheduledAssignments() {
     el.draggable = true;
     el.addEventListener('dragstart', handleDragStart);
     el.addEventListener('dragend', handleDragEnd);
+    
+    // Add touch support for mobile/tablet (iPad)
+    el.addEventListener('touchstart', handleTouchStart, { passive: false });
+    el.addEventListener('touchmove', handleTouchMove, { passive: false });
+    el.addEventListener('touchend', handleTouchEnd, { passive: false });
   });
   if (window.innerWidth <= 991) {
     renderMobileUnscheduledList();
