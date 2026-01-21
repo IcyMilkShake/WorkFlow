@@ -209,6 +209,7 @@ function renderScheduleCalendar() {
           ondrop="handleScheduleDrop(event)"
           ondragover="event.preventDefault(); event.currentTarget.style.background = 'rgba(182, 109, 255, 0.1)';"
           ondragleave="event.currentTarget.style.background = 'var(--card-bg)';"
+          data-touch-drop="true"
         >
             <div class="calendar-day-header-wrapper" style="font-weight: 600; margin-bottom: 0.5rem; color: ${isToday ? 'var(--primary)' : 'var(--text-primary)'};">
               <span class="mobile-day-label">${dayOfWeek}</span>
@@ -773,50 +774,58 @@ function handleTouchMove(e) {
 }
 
 function handleTouchEnd(e) {
-    if (touchClone) {
-        touchClone.remove();
-        touchClone = null;
-    }
+  if (touchClone) {
+    touchClone.remove();
+    touchClone = null;
+  }
+  
+  if (touchElement) {
+    touchElement.style.opacity = '1';
+  }
+  
+  // Find drop target - CRITICAL FIX FOR iPAD
+  const touch = e.changedTouches[0];
+  
+  // iPad Safari fix: temporarily hide the clone to get element underneath
+  if (touchClone) touchClone.style.display = 'none';
+  
+  const elementUnderTouch = document.elementFromPoint(touch.clientX, touch.clientY);
+  
+  if (touchClone) touchClone.style.display = 'block';
+  
+  const calendarDay = elementUnderTouch?.closest('.calendar-day[data-touch-drop="true"]') || 
+                      elementUnderTouch?.closest('.calendar-day');
+  
+  if (calendarDay && draggedAssignment) {
+    const dateKey = calendarDay.dataset.date;
     
-    if (touchElement) {
-        touchElement.style.opacity = '1';
-    }
-    
-    // Find drop target
-    const touch = e.changedTouches[0];
-    const elementUnderTouch = document.elementFromPoint(touch.clientX, touch.clientY);
-    const calendarDay = elementUnderTouch?.closest('.calendar-day');
-    
-    if (calendarDay && draggedAssignment) {
-        const dateKey = calendarDay.dataset.date;
-        
-        if (!scheduleEvents[dateKey]) scheduleEvents[dateKey] = [];
+    if (!scheduleEvents[dateKey]) scheduleEvents[dateKey] = [];
 
-        const eventId = Date.now().toString();
-        scheduleEvents[dateKey].push({
-            id: eventId,
-            title: draggedAssignment.title,
-            assignmentId: draggedAssignment.title + '_' + draggedAssignment.courseName,
-            courseName: draggedAssignment.courseName,
-            startTime: '09:00',
-            endTime: '10:00',
-            alertBefore: 60,
-            link: draggedAssignment.link
-        });
-
-        renderScheduleCalendar();
-        renderUnscheduledAssignments();
-        renderMobileUnscheduledList();
-        showToast(`✅ Added to ${dateKey}`);
-    }
-    
-    // Reset highlights
-    document.querySelectorAll('.calendar-day').forEach(day => {
-        day.style.background = 'var(--card-bg)';
+    const eventId = Date.now().toString();
+    scheduleEvents[dateKey].push({
+      id: eventId,
+      title: draggedAssignment.title,
+      assignmentId: draggedAssignment.title + '_' + draggedAssignment.courseName,
+      courseName: draggedAssignment.courseName,
+      startTime: '09:00',
+      endTime: '10:00',
+      alertBefore: 60,
+      link: draggedAssignment.link
     });
-    
-    draggedAssignment = null;
-    touchElement = null;
+
+    renderScheduleCalendar();
+    renderUnscheduledAssignments();
+    renderMobileUnscheduledList();
+    showToast(`✅ Added to ${dateKey}`);
+  }
+  
+  // Reset highlights
+  document.querySelectorAll('.calendar-day').forEach(day => {
+    day.style.background = 'var(--card-bg)';
+  });
+  
+  draggedAssignment = null;
+  touchElement = null;
 }
 
 window.exportToICS = function() {
@@ -1728,20 +1737,30 @@ function addTypingIndicator() {
 function initializeGoogleAuth() {
   if (USE_MOCK_DATA) return;
   
-  // Note: For offline access (Refresh Token), we need to request 'code' flow, 
-  // but standard initTokenClient uses 'implicit' flow.
-  // We will configure this to use 'code' flow for the initial permission grant if possible,
-  // or simply add prompt: 'consent' and access_type: 'offline' equivalent if supported by the client.
-  // Actually, initTokenClient is for implicit flow (access token only).
-  // For offline access, we need initCodeClient.
+  // Wait for Google API to fully load
+  const initGoogle = () => {
+    if (typeof google === 'undefined' || !google.accounts) {
+      console.log('⏳ Waiting for Google API...');
+      setTimeout(initGoogle, 100);
+      return;
+    }
+    
+    try {
+      googleTokenClient = google.accounts.oauth2.initCodeClient({
+        client_id: GOOGLE_CLIENT_ID,
+        scope: GOOGLE_SCOPES,
+        ux_mode: 'popup',
+        select_account: true,
+        callback: handleGoogleAuthResponse,
+      });
+      console.log('✅ Google Auth initialized');
+    } catch (error) {
+      console.error('❌ Failed to initialize Google Auth:', error);
+      setTimeout(initGoogle, 500); // Retry after 500ms
+    }
+  };
   
-  googleTokenClient = google.accounts.oauth2.initCodeClient({
-    client_id: GOOGLE_CLIENT_ID,
-    scope: GOOGLE_SCOPES,
-    ux_mode: 'popup',
-    select_account: true,
-    callback: handleGoogleAuthResponse,
-  });
+  initGoogle();
 }
 
 function handleGoogleAuthResponse(response) {
@@ -1845,7 +1864,7 @@ async function loadAssignments() {
       return;
     }
 
-    if (userinfo.ok) {
+if (userinfo.ok) {
       const pfp = await userinfo.json();
       googleUserId = pfp.sub;
       
@@ -1856,13 +1875,38 @@ async function loadAssignments() {
       const avatarDiv = qs('.user-avatar');
       const nameDiv = qs('.user-name');
       
+      // Helper function to load image with fallback
+      const loadProfilePicture = (url) => {
+        if (!url) {
+          avatarDiv.innerHTML = '<i class="ph ph-user-circle" style="font-size: 2rem;"></i>';
+          return;
+        }
+        
+        // Preload image to check if it loads successfully
+        const img = new Image();
+        img.onload = () => {
+          avatarDiv.style.backgroundImage = `url(${url})`;
+          avatarDiv.innerHTML = ''; // Clear fallback icon
+          localStorage.setItem('userProfilePic', url);
+        };
+        img.onerror = () => {
+          console.warn('Failed to load profile picture, using fallback icon');
+          avatarDiv.innerHTML = '<i class="ph ph-user-circle" style="font-size: 2rem;"></i>';
+          avatarDiv.style.backgroundImage = 'none';
+          localStorage.removeItem('userProfilePic'); // Clear bad cache
+        };
+        img.src = url;
+      };
+      
       if (pfp.picture && pfp.picture !== cachedPic) {
-        // Only update if different
-        localStorage.setItem('userProfilePic', pfp.picture);
-        avatarDiv.style.backgroundImage = `url(${pfp.picture})`;
+        // Load new picture with fallback handling
+        loadProfilePicture(pfp.picture);
       } else if (cachedPic) {
-        // Use cached version
-        avatarDiv.style.backgroundImage = `url(${cachedPic})`;
+        // Try to use cached version with fallback
+        loadProfilePicture(cachedPic);
+      } else {
+        // No picture available
+        avatarDiv.innerHTML = '<i class="ph ph-user-circle" style="font-size: 2rem;"></i>';
       }
       
       if (pfp.name && pfp.name !== cachedName) {
@@ -1999,6 +2043,147 @@ async function loadAssignments() {
     hideLoadingOverlay();
     updateAIViewIfActive();
   }
+}
+
+function generateMockData() {
+  const mockCourses = [
+    { id: '1', name: 'AP Biology' },
+    { id: '2', name: 'Calculus II' },
+    { id: '3', name: 'World Literature' },
+    { id: '4', name: 'Chemistry Honors' },
+    { id: '5', name: 'U.S. History' }
+  ];
+
+  const today = new Date();
+  const mockAssignments = [
+    // Late assignments
+    {
+      source: 'google',
+      title: 'Cell Division Lab Report',
+      courseName: 'AP Biology',
+      description: 'Complete lab report on mitosis and meiosis observations',
+      maxPoints: 100,
+      dueDate: { 
+        year: today.getFullYear(), 
+        month: today.getMonth() + 1, 
+        day: today.getDate() - 3 
+      },
+      status: 'late',
+      link: '#'
+    },
+    {
+      source: 'google',
+      title: 'Integration Practice Problems',
+      courseName: 'Calculus II',
+      description: 'Complete problems 1-25 on integration techniques',
+      maxPoints: 50,
+      dueDate: { 
+        year: today.getFullYear(), 
+        month: today.getMonth() + 1, 
+        day: today.getDate() - 5 
+      },
+      status: 'late',
+      link: '#'
+    },
+    // Due tomorrow
+    {
+      source: 'google',
+      title: 'Shakespeare Essay Draft',
+      courseName: 'World Literature',
+      description: 'First draft of Hamlet analysis essay',
+      maxPoints: 150,
+      dueDate: { 
+        year: today.getFullYear(), 
+        month: today.getMonth() + 1, 
+        day: today.getDate() + 1 
+      },
+      status: 'pending',
+      link: '#'
+    },
+    // Due in 2 days
+    {
+      source: 'google',
+      title: 'Chemical Bonding Quiz',
+      courseName: 'Chemistry Honors',
+      maxPoints: 75,
+      dueDate: { 
+        year: today.getFullYear(), 
+        month: today.getMonth() + 1, 
+        day: today.getDate() + 2 
+      },
+      status: 'pending',
+      link: '#'
+    },
+    // Due in 5 days
+    {
+      source: 'google',
+      title: 'Civil War Research Paper',
+      courseName: 'U.S. History',
+      description: 'Research and write 5-page paper on causes of Civil War',
+      maxPoints: 200,
+      dueDate: { 
+        year: today.getFullYear(), 
+        month: today.getMonth() + 1, 
+        day: today.getDate() + 5 
+      },
+      status: 'pending',
+      link: '#'
+    },
+    {
+      source: 'google',
+      title: 'Photosynthesis Worksheet',
+      courseName: 'AP Biology',
+      maxPoints: 25,
+      dueDate: { 
+        year: today.getFullYear(), 
+        month: today.getMonth() + 1, 
+        day: today.getDate() + 6 
+      },
+      status: 'pending',
+      link: '#'
+    },
+    // Submitted (for productivity tracking)
+    {
+      source: 'google',
+      title: 'Derivative Rules Test',
+      courseName: 'Calculus II',
+      maxPoints: 100,
+      dueDate: { 
+        year: today.getFullYear(), 
+        month: today.getMonth() + 1, 
+        day: today.getDate() - 1 
+      },
+      status: 'submitted',
+      completionTime: new Date(today.getTime() - 24 * 60 * 60 * 1000).toISOString(),
+      link: '#'
+    },
+    {
+      source: 'google',
+      title: 'Poetry Analysis',
+      courseName: 'World Literature',
+      maxPoints: 50,
+      dueDate: { 
+        year: today.getFullYear(), 
+        month: today.getMonth() + 1, 
+        day: today.getDate() - 2 
+      },
+      status: 'submitted',
+      completionTime: new Date(today.getTime() - 48 * 60 * 60 * 1000).toISOString(),
+      link: '#'
+    }
+  ];
+
+  // Generate mock completion history (past 30 days)
+  const mockHistory = {};
+  for (let i = 0; i < 30; i++) {
+    const date = new Date(today);
+    date.setDate(date.getDate() - i);
+    const dateKey = date.toISOString().split('T')[0];
+    // Random completions (0-3 per day)
+    mockHistory[dateKey] = Math.floor(Math.random() * 4);
+  }
+
+  return { courses: mockCourses, assignments: mockAssignments, history: mockHistory };
 }
 
 function updateAIViewIfActive() {
@@ -2423,6 +2608,29 @@ window.addEventListener('DOMContentLoaded', () => {
     });
   });
 
+byId('mockLoginBtn')?.addEventListener('click', () => {
+    console.log('🧪 Loading mock data...');
+    
+    qs('.user-name').textContent = 'Demo Teacher';
+    qs('.user-avatar').innerHTML = '<i class="ph ph-user-circle" style="font-size: 2rem;"></i>';
+    
+    const mockData = generateMockData();
+    allCoursesData = mockData.courses;
+    allAssignmentsData = mockData.assignments;
+    completionHistory = mockData.history;
+    
+    localStorage.setItem('completionHistory', JSON.stringify(completionHistory));
+    
+    googleAccessToken = 'MOCK_TOKEN';
+    showDashboard();
+    
+    recalculateProductivityFromHistory(allAssignmentsData);
+    displayAssignments(allAssignmentsData);
+    updateStats(allAssignmentsData);
+    
+    showToast('🧪 Demo mode activated! Explore the app with sample data.');
+  });
+
   byId('googleLoginBtn')?.addEventListener('click', () => {
     if (USE_MOCK_DATA) {
       googleAccessToken = 'MOCK_TOKEN';
@@ -2431,10 +2639,23 @@ window.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    if (GOOGLE_CLIENT_ID && !GOOGLE_CLIENT_ID.includes('YOUR_')) {
-      googleTokenClient.requestCode();
-    } else {
+    if (!GOOGLE_CLIENT_ID || GOOGLE_CLIENT_ID.includes('YOUR_')) {
       showError('Please configure your Google Client ID first!');
+      return;
+    }
+    
+    if (!googleTokenClient) {
+      showError('Google Sign-In is still loading. Please wait a moment and try again.');
+      // Retry initialization
+      initializeGoogleAuth();
+      return;
+    }
+    
+    try {
+      googleTokenClient.requestCode();
+    } catch (error) {
+      console.error('Login error:', error);
+      showError('Failed to open login. Please try again or reload the page.');
     }
   });
 
