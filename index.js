@@ -2073,11 +2073,13 @@ if (userinfo.ok) {
 
 function generateMockData() {
   const mockCourses = [
-    { id: '1', name: 'AP Biology' },
-    { id: '2', name: 'Calculus II' },
-    { id: '3', name: 'World Literature' },
-    { id: '4', name: 'Chemistry Honors' },
-    { id: '5', name: 'U.S. History' }
+    { id: '1', name: 'Biology' },
+    { id: '2', name: 'Calculus' },
+    { id: '3', name: 'English' },
+    { id: '4', name: 'Chemistry' },
+    { id: '5', name: 'History' },
+    { id: '6', name: 'Technology' },
+    { id: '7', name: 'Creative Writing' }
   ];
 
   const today = new Date();
