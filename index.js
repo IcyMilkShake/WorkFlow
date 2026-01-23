@@ -134,6 +134,7 @@ let previousAssignmentStates = JSON.parse(localStorage.getItem('previousStates')
 let completionHistory = JSON.parse(localStorage.getItem('completionHistory') || '{}');
 let scheduleEvents = {};
 let isLoading = false;
+let loadingError = null;
 let conversationHistory = [];
 
 let statusChartInstance = null;
@@ -1580,6 +1581,14 @@ async function generateProactiveGreeting() {
   const typingDiv = addTypingIndicator();
 
   try {
+    if (loadingError) {
+      typingDiv.remove();
+      const errorMsg = "I had trouble accessing your assignments. Try reloading the dashboard.";
+      addChatMessage(errorMsg, "assistant");
+      conversationHistory.push({ role: "assistant", content: errorMsg });
+      return;
+    }
+
     const filtered = allAssignmentsData.filter(a => a.status !== 'submitted' && !ignoredCourses.has(a.courseName));
 
     if (filtered.length === 0) {
@@ -1827,10 +1836,11 @@ async function exchangeCodeForToken(code) {
   }
 }
 
-async function loadAssignments() {
+window.loadAssignments = async function() {
   const assignmentsList = byId('assignmentsList');
   
   isLoading = true;
+  loadingError = null;
   showLoadingOverlay('Loading your courses...');
   assignmentsList.innerHTML = '';
   updateAIViewIfActive();
@@ -2048,6 +2058,23 @@ if (userinfo.ok) {
       syncWithServer();
     }
 
+  } catch (error) {
+    loadingError = error;
+    console.error('Error loading assignments:', error);
+    const assignmentsList = byId('assignmentsList');
+    if (assignmentsList) {
+      assignmentsList.innerHTML = `
+        <div class="empty-state error-state">
+          <div class="empty-state-icon" style="color: var(--danger); font-size: 3rem; margin-bottom: 1rem;"><i class="ph ph-warning-circle"></i></div>
+          <h3 style="color: var(--danger);">Failed to load assignments</h3>
+          <p style="margin-bottom: 1.5rem; color: var(--text-secondary);">${error.message || 'Please check your connection and try again.'}</p>
+          <button class="btn btn-primary" onclick="loadAssignments()">
+            <i class="ph ph-arrow-clockwise"></i> Retry
+          </button>
+        </div>
+      `;
+    }
+    showToast('❌ Failed to load data');
   } finally {
     isLoading = false;
     hideLoadingOverlay();
@@ -2516,16 +2543,21 @@ function showLoginScreen() {
   localStorage.removeItem('userName');
   
   // Clear user-specific app data
-  localStorage.removeItem('completionHistory');
-  localStorage.removeItem('previousStates');
-  localStorage.removeItem('ignoredCourses');
+  // localStorage.removeItem('completionHistory');
+  // localStorage.removeItem('previousStates');
+  // localStorage.removeItem('ignoredCourses');
   
   // Reset in-memory state
   scheduleEvents = {};
   conversationHistory = [];
-  completionHistory = {};
-  previousAssignmentStates = {};
-  ignoredCourses = new Set();
+  // completionHistory = {};
+  // previousAssignmentStates = {};
+  // ignoredCourses = new Set();
+  
+  // Reload preferences from storage to ensure consistency if we didn't refresh
+  completionHistory = JSON.parse(localStorage.getItem('completionHistory') || '{}');
+  previousAssignmentStates = JSON.parse(localStorage.getItem('previousStates') || '{}');
+  ignoredCourses = new Set(JSON.parse(localStorage.getItem('ignoredCourses') || '[]'));
   
   // Clear UI
   const chatMessages = byId('chatMessages');

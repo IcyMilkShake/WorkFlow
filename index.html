@@ -6,7 +6,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <script>
-        const APP_VERSION = '2.0.8'; // Increment this with each deploy
+        const APP_VERSION = '2.0.9'; // Increment this with each deploy
         const cachedVersion = localStorage.getItem('appVersion');
 
         if (cachedVersion && cachedVersion !== APP_VERSION) {
@@ -99,6 +99,16 @@
             font-size: 0.85rem;
             cursor: pointer;
             outline: none;
+        }
+        
+        /* Remove arrows/spinners from number input */
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { 
+            -webkit-appearance: none; 
+            margin: 0; 
+        }
+        input[type=number] {
+            -moz-appearance: textfield; /* Firefox */
         }
         
         .compact-select option {
