@@ -1525,14 +1525,15 @@
                         <div class="filter-inputs">
                             <div class="compact-select-group">
                                 <i class="ph ph-calendar filter-icon"></i>
-                                <select id="dueDateFilter" class="compact-select">
-                                    <option value="all">Any Date</option>
-                                    <option value="today">Due Today</option>
-                                    <option value="tomorrow">Due Tomorrow</option>
-                                    <option value="week">This Week</option>
-                                    <option value="month">This Month</option>
-                                    <option value="overdue">Overdue</option>
-                                </select>
+                                    <input 
+                                        type="number" 
+                                        id="dueDateFilter" 
+                                        class="compact-select" 
+                                        placeholder="... days ahead"
+                                        min="0"
+                                        max="365"
+                                        style="width: 150px; padding: 0.5rem;"
+                                    >
                             </div>
 
                             <div class="compact-select-group">

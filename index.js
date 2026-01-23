@@ -1229,13 +1229,14 @@ window.changeProductivityView = function(view) {
 // ASSIGNMENT FILTERS
 // ==========================================
 let currentFilters = {
-  dueDate: 'all',
+  dueDate: '',
   sort: 'dueDate',
   status: 'all'
 };
 
 window.applyFilters = function() {
-  currentFilters.dueDate = byId('dueDateFilter').value;
+  const daysInput = byId('dueDateFilter').value;
+  currentFilters.dueDate = daysInput ? parseInt(daysInput) : '';
   currentFilters.sort = byId('sortFilter').value;
   currentFilters.status = byId('statusFilter').value;
   
@@ -1243,12 +1244,12 @@ window.applyFilters = function() {
 }
 
 window.resetFilters = function() {
-  byId('dueDateFilter').value = 'all';
+  byId('dueDateFilter').value = '';
   byId('sortFilter').value = 'dueDate';
   byId('statusFilter').value = 'all';
   
   currentFilters = {
-    dueDate: 'all',
+    dueDate: '',
     sort: 'dueDate',
     status: 'all'
   };
@@ -1269,39 +1270,22 @@ function filterAssignments(assignments) {
     filtered = filtered.filter(a => a.status === currentFilters.status);
   }
   
-  // Filter by due date
-  if (currentFilters.dueDate !== 'all') {
+  // Filter by custom days input
+  if (currentFilters.dueDate !== '') {
+    const daysAhead = currentFilters.dueDate;
+    const futureDate = new Date(today);
+    futureDate.setDate(futureDate.getDate() + daysAhead);
+    
     filtered = filtered.filter(a => {
       const dueDate = parseGoogleDate(a.dueDate);
       if (!dueDate) return false;
       
-      const tomorrow = new Date(today);
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      
-      const weekFromNow = new Date(today);
-      weekFromNow.setDate(weekFromNow.getDate() + 7);
-      
-      const monthFromNow = new Date(today);
-      monthFromNow.setMonth(monthFromNow.getMonth() + 1);
-      
-      switch(currentFilters.dueDate) {
-        case 'today':
-          return dueDate.getTime() === today.getTime();
-        case 'tomorrow':
-          return dueDate.getTime() === tomorrow.getTime();
-        case 'week':
-          return dueDate >= today && dueDate <= weekFromNow;
-        case 'month':
-          return dueDate >= today && dueDate <= monthFromNow;
-        case 'overdue':
-          return dueDate < today;
-        default:
-          return true;
-      }
+      // Show assignments due within the specified number of days
+      return dueDate >= today && dueDate <= futureDate;
     });
   }
   
-  // Sort assignments
+  // Sort assignments (rest stays the same)
   filtered.sort((a, b) => {
     const dateA = parseGoogleDate(a.dueDate);
     const dateB = parseGoogleDate(b.dueDate);
