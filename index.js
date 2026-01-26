@@ -69,6 +69,39 @@ const byId = (id) => document.getElementById(id);
 const qs = (selector) => document.querySelector(selector);
 const qsa = (selector) => document.querySelectorAll(selector);
 
+const pLimit = (concurrency) => {
+  const queue = [];
+  let activeCount = 0;
+
+  const next = () => {
+    activeCount--;
+    if (queue.length > 0) {
+      queue.shift()();
+    }
+  };
+
+  const run = async (fn, resolve, reject) => {
+    activeCount++;
+    const result = (async () => fn())();
+    try {
+      const value = await result;
+      resolve(value);
+    } catch (err) {
+      reject(err);
+    }
+    next();
+  };
+
+  const enqueue = (fn, resolve, reject) => {
+    queue.push(run.bind(null, fn, resolve, reject));
+    if (activeCount < concurrency && queue.length > 0) {
+      queue.shift()();
+    }
+  };
+
+  return (fn) => new Promise((resolve, reject) => enqueue(fn, resolve, reject));
+};
+
 // Retry fetch with backoff for 429 errors
 async function fetchWithBackoff(url, options, retries = 3, backoff = 1000) {
   try {
@@ -2076,40 +2109,27 @@ if (userinfo.ok) {
     const oneYearAgo = new Date();
     oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
 
-    const allAssignments = [];
+    const limit = pLimit(3); // Concurrency limit of 3 courses
+    let completedCourses = 0;
 
-    // SEQUENTIAL processing with small delays to avoid rate limits
-    for (let i = 0; i < courses.length; i++) {
-      const course = courses[i];
-      
-      // Update loading progress
-      const percent = Math.round(((i + 1) / courses.length) * 100);
-      updateLoadingProgress(percent, `Fetching ${course.name}...`);
-      
+    const coursePromises = courses.map((course) => limit(async () => {
       try {
-        // Small delay between courses
-        if (i > 0) await new Promise(r => setTimeout(r, 200));
-        
-        const courseworkResponse = await fetchWithBackoff(
-          `https://classroom.googleapis.com/v1/courses/${course.id}/courseWork`,
-          { headers: { 'Authorization': `Bearer ${googleAccessToken}` }}
-        );
+        // Parallelize courseWork and submissions fetching
+        const [courseworkResponse, allSubmissions] = await Promise.all([
+          fetchWithBackoff(
+            `https://classroom.googleapis.com/v1/courses/${course.id}/courseWork`,
+            { headers: { 'Authorization': `Bearer ${googleAccessToken}` }}
+          ),
+          fetchAllCourseSubmissions(course.id, googleAccessToken)
+        ]);
 
-        if (!courseworkResponse.ok) continue;
+        if (!courseworkResponse.ok) return [];
 
         const courseworkData = await courseworkResponse.json();
         const coursework = courseworkData.courseWork || [];
-
-        // Fetch ALL submissions for this course in one go (using wildcard '-')
-        // This dramatically reduces API calls from N+1 to 2 per course
-        const allSubmissions = await fetchAllCourseSubmissions(course.id, googleAccessToken);
-        const submissionsMap = new Map();
         
+        const submissionsMap = new Map();
         allSubmissions.forEach(sub => {
-          // Map courseWorkId -> submission object
-          // Note: studentSubmissions list can contain multiple submissions for same work if multiple students (for teachers)
-          // but we are fetching as student ('me'), so usually one per work.
-          // However, the list returns objects that have 'courseWorkId'.
           submissionsMap.set(sub.courseWorkId, sub);
         });
 
@@ -2148,12 +2168,20 @@ if (userinfo.ok) {
           };
         }).filter(a => a !== null); // Remove filtered items
         
-        allAssignments.push(...processedAssignments);
+        completedCourses++;
+        const percent = Math.round((completedCourses / courses.length) * 100);
+        updateLoadingProgress(percent, `Fetching ${course.name}...`);
+
+        return processedAssignments;
 
       } catch (error) {
         console.error(`Error loading coursework for ${course.name}:`, error);
+        return [];
       }
-    }
+    }));
+
+    const results = await Promise.all(coursePromises);
+    const allAssignments = results.flat();
     
     // FINAL FILTER: Remove 365+ day overdue assignments
     allAssignmentsData = allAssignments.filter(assignment => {
