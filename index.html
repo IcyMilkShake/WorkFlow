@@ -759,18 +759,63 @@
             border-top: 1px solid var(--border-color);
             display: flex;
             gap: 1rem;
+            align-items: flex-end; /* Align button with bottom of textarea */
+        }
+
+        .input-wrapper {
+            position: relative;
+            flex: 1;
+        }
+
+        #charCounter {
+            position: absolute;
+            top: -1.25rem;
+            left: 0;
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        #dynamicPlaceholder {
+            position: absolute;
+            top: 1rem; /* Matches textarea padding */
+            left: 1.4rem; /* Matches textarea padding */
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+            font-family: 'Poppins', sans-serif;
+            pointer-events: none;
+            user-select: none;
+            opacity: 0.6;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: calc(100% - 2rem);
+            transition: transform 0.4s ease-in-out, opacity 0.4s ease-in-out;
+            transform: translateX(0);
+        }
+
+        .placeholder-exit {
+            transform: translateX(-15px) !important;
+            opacity: 0 !important;
+        }
+
+        .placeholder-enter {
+            transform: translateX(15px);
+            opacity: 0;
         }
 
         .chat-input {
-            flex: 1;
+            width: 100%; /* Needed because of wrapper */
             background: var(--dark);
             border: 1px solid var(--border-color);
             border-radius: 8px;
             padding: 1rem;
+            padding-left: 1.4rem;
             color: var(--text-primary);
             font-family: 'Poppins', sans-serif;
             font-size: 0.875rem;
             resize: none;
+            display: block; /* Removes inline spacing issues */
         }
 
         .chat-input:focus {
@@ -1712,7 +1757,11 @@
                                 </div>
                             </div>
                             <div class="chat-input-container">
-                                <textarea id="chatInput" class="chat-input" rows="2" placeholder="Ask me anything about your assignments..."></textarea>
+                                <div class="input-wrapper">
+                                    <div id="charCounter">0/500</div>
+                                    <div id="dynamicPlaceholder">Ask me anything about your assignments...</div>
+                                    <textarea id="chatInput" class="chat-input" rows="2" maxlength="500"></textarea>
+                                </div>
                                 <button class="btn btn-primary" onclick="sendChatMessage()" style="padding: 1rem 1.5rem;">Send</button>
                             </div>
                         </div>

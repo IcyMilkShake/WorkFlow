@@ -1534,6 +1534,121 @@ function generateUpcomingDeadlines(upcomingAssignments) {
 // ==========================================
 // AI ASSISTANT
 // ==========================================
+const PROMPT_TEMPLATES = [
+  "Please explain what {assignment name} is.",
+  "How should I start my {assignment name}?",
+  "Create a study plan for {course name}.",
+  "What assignments are due this week?",
+  "Summarize my pending work.",
+  "Help me break down {assignment name} into smaller tasks.",
+  "Why is {assignment name} important?"
+];
+
+let placeholderInterval = null;
+let currentPromptIndex = 0;
+
+function initChatInput() {
+  const input = byId('chatInput');
+  if (!input || input.dataset.initialized) return;
+
+  input.dataset.initialized = 'true';
+  
+  // Character Counter
+  input.addEventListener('input', updateCharCounter);
+  
+  // Placeholder visibility on focus/blur/input
+  const togglePlaceholder = () => {
+    const placeholder = byId('dynamicPlaceholder');
+    if (placeholder) {
+      placeholder.style.opacity = (input.value.trim() === '') ? '0.6' : '0';
+    }
+  };
+  
+  input.addEventListener('input', togglePlaceholder);
+  input.addEventListener('focus', togglePlaceholder);
+  input.addEventListener('blur', togglePlaceholder);
+  
+  // Start rotation
+  startPlaceholderRotation();
+}
+
+function updateCharCounter() {
+  const input = byId('chatInput');
+  const counter = byId('charCounter');
+  if (!input || !counter) return;
+  
+  const currentLength = input.value.length;
+  const maxLength = input.getAttribute('maxlength') || 500;
+  
+  counter.textContent = `${currentLength}/${maxLength}`;
+  
+  if (currentLength >= maxLength) {
+    counter.style.color = 'var(--danger)';
+  } else {
+    counter.style.color = 'var(--text-muted)';
+  }
+}
+
+function getFormattedPrompt() {
+  const template = PROMPT_TEMPLATES[currentPromptIndex];
+  currentPromptIndex = (currentPromptIndex + 1) % PROMPT_TEMPLATES.length;
+  
+  let result = template;
+  
+  // Get random assignment/course
+  const filteredAssignments = allAssignmentsData.filter(a => !ignoredCourses.has(a.courseName) && a.status !== 'submitted');
+  const filteredCourses = allCoursesData.filter(c => !ignoredCourses.has(c.name));
+  
+  if (result.includes('{assignment name}')) {
+    const randomAssignment = filteredAssignments.length > 0 
+      ? filteredAssignments[Math.floor(Math.random() * filteredAssignments.length)] 
+      : { title: 'your assignment' };
+    result = result.replace('{assignment name}', `"${randomAssignment.title}"`);
+  }
+  
+  if (result.includes('{course name}')) {
+    const randomCourse = filteredCourses.length > 0 
+      ? filteredCourses[Math.floor(Math.random() * filteredCourses.length)] 
+      : { name: 'your course' };
+    result = result.replace('{course name}', `"${randomCourse.name}"`);
+  }
+  
+  return result;
+}
+
+function startPlaceholderRotation() {
+  if (placeholderInterval) clearInterval(placeholderInterval);
+  
+  // Initial prompt
+  const placeholder = byId('dynamicPlaceholder');
+  if (placeholder) placeholder.textContent = getFormattedPrompt();
+  
+  placeholderInterval = setInterval(rotatePlaceholder, 5000);
+}
+
+function rotatePlaceholder() {
+  const input = byId('chatInput');
+  const placeholder = byId('dynamicPlaceholder');
+  
+  // Only rotate if input is empty and visible
+  if (!input || !placeholder || input.value.trim() !== '' || byId('aiAssistantPage').style.display === 'none') return;
+  
+  // Add exit class
+  placeholder.classList.add('placeholder-exit');
+  
+  setTimeout(() => {
+    placeholder.textContent = getFormattedPrompt();
+    
+    placeholder.classList.remove('placeholder-exit');
+    placeholder.classList.add('placeholder-enter');
+    
+    // Force reflow
+    void placeholder.offsetWidth;
+    
+    placeholder.classList.remove('placeholder-enter');
+  }, 400); // Wait for CSS transition time
+}
+
 function updateAIPendingCount() {
   const countElement = byId('aiPendingCount');
   if (!countElement) return;
@@ -1565,6 +1680,7 @@ function initAIAssistant() {
 
   chatInterface.style.display = 'block';
   updateAIPendingCount();
+  initChatInput(); // Initialize the enhanced chat input
   
   if (!window.hasGeneratedGreeting) {
     window.hasGeneratedGreeting = true;
