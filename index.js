@@ -1798,6 +1798,11 @@ window.sendChatMessage = async function() {
   const message = input.value.trim();
   if (!message) return;
 
+  if (message.length > 500) {
+    showToast('❌ Message exceeds 500 characters!');
+    return;
+  }
+
   addChatMessage(message, 'user');
   input.value = '';
 
