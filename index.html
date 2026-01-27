@@ -1257,7 +1257,7 @@
 /* Mobile Schedule Improvements */
 @media (max-width: 991px) {
     /* Make export button smaller on mobile */
-    #schedulePage .btn-primary:has(.ph-download) {
+    #schedulePage .btn-primary:has(.ph-calendar-plus) {
         padding: 0.5rem 1rem !important;
         font-size: 0.875rem;
     }
@@ -1384,6 +1384,14 @@
         padding: 0.5rem;
         margin-bottom: 0.5rem;
     }
+}
+
+.hide-mobile { display: inline; }
+.show-mobile { display: none; }
+
+@media (max-width: 576px) {
+    .hide-mobile { display: none; }
+    .show-mobile { display: inline; }
 }
     </style>
 </head>
@@ -1794,9 +1802,14 @@
                                     <i class="ph ph-calendar" style="margin-right: 0.5rem;"></i>
                                     Calendar
                                 </div>
-                                <button class="btn btn-primary" onclick="exportToICS()">
-                                    <i class="ph ph-download"></i> Export to .ics
-                                </button>
+                                <div style="display: flex; gap: 0.5rem;">
+                                    <button class="btn btn-primary" onclick="downloadICS()" title="Add to Calendar">
+                                        <i class="ph ph-calendar-plus"></i> <span class="hide-mobile">Add to Calendar</span><span class="show-mobile">Add</span>
+                                    </button>
+                                    <button class="btn" onclick="shareICS()" style="background: var(--dark); color: var(--text-primary); padding: 0.5rem 1rem;" title="Share File">
+                                        <i class="ph ph-share-network"></i>
+                                    </button>
+                                </div>
                             </div>
                             <div id="scheduleCalendar"></div>
                         </div>
