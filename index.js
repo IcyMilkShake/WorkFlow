@@ -867,7 +867,7 @@ function handleTouchEnd(e) {
   touchElement = null;
 }
 
-window.exportToICS = async function() {
+window.exportToICS = function() {
   let icsContent = `BEGIN:VCALENDAR
 VERSION:2.0
 PRODID:-//WorkFlow//Assignment Tracker//EN
@@ -921,27 +921,6 @@ END:VALARM
   icsContent += `END:VCALENDAR`;
 
   const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
-  const file = new File([blob], 'workflow-assignments.ics', { type: 'text/calendar' });
-
-  // Try native sharing first (Mobile/Safari)
-  if (navigator.canShare && navigator.canShare({ files: [file] })) {
-    try {
-      await navigator.share({
-        files: [file],
-        title: 'WorkFlow Assignments',
-        text: 'Import these assignments to your calendar app.'
-      });
-      showToast('✅ Calendar shared!');
-      return;
-    } catch (err) {
-      if (err.name !== 'AbortError') {
-        console.warn('Share failed, falling back to download:', err);
-      } else {
-        return; // User cancelled
-      }
-    }
-  }
-
   const link = document.createElement('a');
   link.href = URL.createObjectURL(blob);
   link.download = 'workflow-assignments.ics';
@@ -949,7 +928,7 @@ END:VALARM
   link.click();
   document.body.removeChild(link);
   
-  showToast('📅 Calendar exported! Import to Apple Calendar, Google Calendar, or Outlook.');
+  showToast('📅 Calendar file downloaded! Open it to import events.');
 }
 
 // ==========================================
