@@ -920,25 +920,13 @@ END:VALARM
 
   icsContent += `END:VCALENDAR`;
 
-  const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+  const blob = new Blob([icsContent], { type: 'text/calendar' });
   const file = new File([blob], 'workflow-assignments.ics', { type: 'text/calendar' });
   return { blob, file };
 }
 
-window.downloadICS = function() {
-  const { blob } = generateICSFile();
-  const link = document.createElement('a');
-  link.href = URL.createObjectURL(blob);
-  link.download = 'workflow-assignments.ics';
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  
-  showToast('📅 Calendar file downloaded! Open it to import events.');
-}
-
-window.shareICS = async function() {
-  const { file } = generateICSFile();
+window.exportToICS = async function() {
+  const { blob, file } = generateICSFile();
   
   if (navigator.canShare && navigator.canShare({ files: [file] })) {
     try {
@@ -948,19 +936,26 @@ window.shareICS = async function() {
         text: 'Import these assignments to your calendar app.'
       });
       showToast('✅ Calendar shared!');
+      return;
     } catch (err) {
       if (err.name !== 'AbortError') {
         console.warn('Share failed, falling back to download:', err);
-        downloadICS();
+      } else {
+        return; // User cancelled
       }
     }
-  } else {
-    downloadICS();
   }
-}
 
-// Backwards compatibility alias
-window.exportToICS = window.downloadICS;
+  // Fallback to direct download
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = 'workflow-assignments.ics';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  
+  showToast('📅 Calendar exported! Import to Apple Calendar, Google Calendar, or Outlook.');
+}
 
 // ==========================================
 // NOTIFICATIONS (Updated to respect ignored courses)
