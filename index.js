@@ -867,7 +867,7 @@ function handleTouchEnd(e) {
   touchElement = null;
 }
 
-function generateICSFile() {
+window.exportToICS = async function() {
   let icsContent = `BEGIN:VCALENDAR
 VERSION:2.0
 PRODID:-//WorkFlow//Assignment Tracker//EN
@@ -920,14 +920,10 @@ END:VALARM
 
   icsContent += `END:VCALENDAR`;
 
-  const blob = new Blob([icsContent], { type: 'text/calendar' });
+  const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
   const file = new File([blob], 'workflow-assignments.ics', { type: 'text/calendar' });
-  return { blob, file };
-}
 
-window.exportToICS = async function() {
-  const { blob, file } = generateICSFile();
-  
+  // Try native sharing first (Mobile/Safari)
   if (navigator.canShare && navigator.canShare({ files: [file] })) {
     try {
       await navigator.share({
@@ -946,7 +942,6 @@ window.exportToICS = async function() {
     }
   }
 
-  // Fallback to direct download
   const link = document.createElement('a');
   link.href = URL.createObjectURL(blob);
   link.download = 'workflow-assignments.ics';
