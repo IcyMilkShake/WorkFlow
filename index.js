@@ -949,7 +949,7 @@ END:VALARM
   link.click();
   document.body.removeChild(link);
   
-  showToast('📅 Calendar exported! Import to Apple Calendar, Google Calendar, or Outlook.');
+  showToast('📅 Calendar exported! Import to Apple Calendar or Outlook.');
 }
 
 // ==========================================
