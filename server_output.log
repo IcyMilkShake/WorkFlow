@@ -1,0 +1,11 @@
+[dotenv@17.2.3] injecting env (0) from .env -- tip: 📡 add observability to secrets: https://dotenvx.com/ops
+✅ Web Push initialized
+undefined
+🚀 Server running on port 8000
+📱 PWA ready for installation
+
+✅ Features enabled:
+  - Offline support
+  - Auto-updates
+  - Install prompts
+🔍 Checking assignments for push notifications...
