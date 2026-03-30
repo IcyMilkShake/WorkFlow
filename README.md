@@ -12,7 +12,7 @@ A simple, fast **PWA app** designed to make managing **Google Classroom assignme
 
 ## Overview
 
-**WorkFlow** is a web app / Progressive Web App that lets you check all your Google Classroom assignments with **just one Google sign-in**. Instead of navigating through multiple classes and pages, WorkFlow centralizes everything so you can quickly see what matters.
+**WorkFlow** is a web app / Progressive Web App that lets you check all your Google Classroom assignments with **just one Google sign-in**. Instead of navigating through multiple classes and pages or going to google classroom to look at to-do list, WorkFlow can summarize everything in one so you can quickly see what matters.
 
 With a single tap you can instantly view:
 
@@ -20,7 +20,7 @@ With a single tap you can instantly view:
 * Late assignments
 * Pending assignments
 
-This allows you to stay organized and avoid overlooked work.
+This allows you to stay organized and avoid overlooking work.
 
 ## Features
 
@@ -36,6 +36,8 @@ Assignments are automatically categorized so you can easily see:
 * Late submissions
 * Upcoming tasks
 
+Or change the filter how you like.
+
 ### Interactive Performance Stats
 
 WorkFlow turns your assignment data into **fun and useful statistics**, including:
@@ -43,9 +45,9 @@ WorkFlow turns your assignment data into **fun and useful statistics**, includin
 * Productivity graphs
 * Assignment streaks
 * Performance trends
-* Other interactive insights
+* Other fun interactive insights
 
-These help you visualize how well you're keeping up with your work.
+This'll help you visualize how well you're keeping up with your work.
 
 ### AI Assistant
 
@@ -60,11 +62,11 @@ The assistant analyzes your listed assignments and provides immediate suggestion
 
 ### Calendar Integration
 
-WorkFlow makes scheduling assignments simple.
+WorkFlow makes scheduling assignments on calendar simple.
 
 You can:
 
-* Automatically assign tasks to dates
+* Automatically assign pending tasks to dates in just a click
 * Drag assignments directly onto a calendar
 * Export schedules to `.ics` format
 
@@ -84,6 +86,10 @@ WorkFlow is built as a **Progressive Web App (PWA)**, meaning you can:
 * Install it like a native app
 * Access it on desktop, tablet, or mobile
 
-## Goal
+## Note
 
-WorkFlow aims to **simplify the process of tracking and planning school assignments
+This project is mainly used to streamline my workflow while studying. 
+If this project sounds like something you may or could be looking for it is most definitely worth it to give it a try.
+Although please be aware that there may be a few bugs here and there but, rest assured that none of the bugs is critical.
+
+AlthouWorkFlow aims to **simplify the process of tracking and planning school assignments
