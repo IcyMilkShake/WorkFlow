@@ -90,4 +90,4 @@ WorkFlow is built as a **Progressive Web App (PWA)**, meaning you can:
 
 This project is mainly used to streamline my workflow while studying. 
 If this project sounds like something you may or could be looking for it is most definitely **worth it** to give it a try.
-Although please be aware that there may be a **few bugs** here and there but, **rest assured** that none of the bugs is **critical**.
+Although please be aware that there may be a **few bugs** here and there but, **rest assured** that none of the bugs are **critical**.
